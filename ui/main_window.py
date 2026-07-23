@@ -406,9 +406,14 @@ class MainWindow(tk.Tk):
             if str(group["id"]) == str(old_selected_id):
                 self.group_listbox.selection_set(idx)
                 
-        if self.group_listbox.curselection():
-            self.sla_settings_btn.configure(state="normal")
+        if tracked_groups:
+            self.manage_staff_btn.configure(state="normal")
+            if self.group_listbox.curselection():
+                self.sla_settings_btn.configure(state="normal")
+            else:
+                self.sla_settings_btn.configure(state="disabled")
         else:
+            self.manage_staff_btn.configure(state="disabled")
             self.sla_settings_btn.configure(state="disabled")
 
         # 2. Cập nhật danh sách ticket chưa phản hồi
@@ -547,16 +552,25 @@ class MainWindow(tk.Tk):
             self.refresh_supported_tickets_tree()
 
     def on_manage_staff_clicked(self):
-        if not self.selected_group_id:
-            messagebox.showwarning("Cảnh báo", "Vui lòng chọn một nhóm Zalo trong danh sách.")
+        tracked_groups = GroupDAO.get_tracked_groups()
+        if not tracked_groups:
+            messagebox.showwarning("Cảnh báo", "Vui lòng thêm ít nhất một nhóm Zalo vào danh sách theo dõi trước khi quản lý nhân viên.")
             return
 
-        tracked_groups = GroupDAO.get_tracked_groups()
-        selected_group = next((g for g in tracked_groups if str(g["id"]) == str(self.selected_group_id)), None)
+        if not self.selected_group_id:
+            # Tự động chọn nhóm đầu tiên nếu người dùng chưa click chọn nhóm
+            self.selected_group_id = tracked_groups[0]["id"]
+            self.group_listbox.selection_clear(0, tk.END)
+            self.group_listbox.selection_set(0)
+
+        selected_group = next((g for g in tracked_groups if str(g["id"]) == str(self.selected_group_id)), tracked_groups[0])
         group_name = selected_group["name"] if selected_group else f"Nhóm {self.selected_group_id}"
 
         from ui.dialogs import StaffManagementDialog
         dialog = StaffManagementDialog(self.selected_group_id, group_name, self.zalo_service, parent=self)
+        dialog.deiconify()
+        dialog.lift()
+        dialog.focus_force()
         self.wait_window(dialog)
 
         self.refresh_ticket_list()

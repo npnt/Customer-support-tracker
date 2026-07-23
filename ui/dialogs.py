@@ -406,7 +406,7 @@ class StaffManagementDialog(tk.Toplevel):
         ttk.Label(main_frame, text=f"Tích chọn Nhân viên Hỗ trợ cho {self.group_name}:", font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
         ttk.Label(main_frame, text="* Chỉ tin nhắn từ các nhân viên được tích chọn mới được tính là tiếp nhận/xử lý Ticket.", font=("Arial", 8, "italic"), fg="#7F8C8D", wraplength=420).pack(anchor="w", pady=(0, 10))
 
-        # Search Bar
+        # Search Bar & Add Manual Name
         search_frame = ttk.Frame(main_frame)
         search_frame.pack(fill="x", pady=(0, 8))
         ttk.Label(search_frame, text="🔍 Tìm tên:").pack(side="left", padx=(0, 5))
@@ -414,6 +414,13 @@ class StaffManagementDialog(tk.Toplevel):
         self.search_var.trace("w", lambda *args: self.filter_members())
         search_entry = ttk.Entry(search_frame, textvariable=self.search_var)
         search_entry.pack(side="left", fill="x", expand=True)
+
+        manual_frame = ttk.LabelFrame(main_frame, text="➕ Thêm tên Nhân viên thủ công", padding="5")
+        manual_frame.pack(fill="x", pady=(0, 8))
+
+        self.manual_name_entry = ttk.Entry(manual_frame)
+        self.manual_name_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        ttk.Button(manual_frame, text="Thêm", command=self.on_add_manual_name).pack(side="left")
 
         # Container listbox frame with canvas/scrollbar
         list_container = ttk.LabelFrame(main_frame, text="Danh sách thành viên nhóm", padding="5")
@@ -434,19 +441,24 @@ class StaffManagementDialog(tk.Toplevel):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Load members & current staff
+        # Load members & current staff safely
         from database import GroupDAO
         current_staff = set(GroupDAO.get_group_support_staff(self.group_id))
         
-        all_members = []
+        all_members_set = set(current_staff)
         if self.zalo_service and hasattr(self.zalo_service, "fetch_group_members"):
-            all_members = self.zalo_service.fetch_group_members(self.group_id)
+            try:
+                fetched = self.zalo_service.fetch_group_members(self.group_id)
+                if fetched:
+                    all_members_set.update(fetched)
+            except Exception as err:
+                print(f"Lỗi fetch_group_members: {err}")
+
+        all_members = sorted(list(all_members_set))
         if not all_members:
-            all_members = sorted(list(current_staff)) or ["Admin", "KTV Hỗ Trợ"]
+            all_members = ["Admin", "KTV Hỗ Trợ"]
 
         self.member_vars = {}
-        self.check_widgets = []
-
         for name in all_members:
             var = tk.BooleanVar(value=(name in current_staff))
             cb = ttk.Checkbutton(self.scrollable_frame, text=name, variable=var)
@@ -459,6 +471,26 @@ class StaffManagementDialog(tk.Toplevel):
 
         ttk.Button(btn_frame, text="💾 Lưu danh sách Nhân viên", command=self.on_save).pack(side="left", padx=(0, 10))
         ttk.Button(btn_frame, text="Hủy", command=self.destroy).pack(side="left")
+
+    def on_add_manual_name(self):
+        name = self.manual_name_entry.get().strip()
+        if not name:
+            messagebox.showwarning("Cảnh báo", "Vui lòng nhập tên Nhân viên Hỗ trợ.")
+            return
+
+        if name in self.member_vars:
+            var, cb = self.member_vars[name]
+            var.set(True)
+            cb.pack(anchor="w", pady=2, padx=5)
+            messagebox.showinfo("Thông báo", f"Đã chọn nhân viên: '{name}'")
+        else:
+            var = tk.BooleanVar(value=True)
+            cb = ttk.Checkbutton(self.scrollable_frame, text=name, variable=var)
+            cb.pack(anchor="w", pady=2, padx=5)
+            self.member_vars[name] = (var, cb)
+            messagebox.showinfo("Thông báo", f"Đã thêm và chọn nhân viên: '{name}'")
+
+        self.manual_name_entry.delete(0, tk.END)
 
     def filter_members(self):
         query = self.search_var.get().strip().lower()
