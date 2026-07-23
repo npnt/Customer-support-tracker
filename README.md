@@ -4,6 +4,14 @@
 
 ---
 
+## 📚 Tài Liệu Kỹ Thuật & Chuyển Giao
+
+Dự án cung cấp bộ tài liệu kỹ thuật chuẩn mực phục vụ đọc hiểu, chuyển giao và tiếp tục phát triển:
+- 📋 [**Software Requirements Specification (SRS)**](file:///d:/Projects/CustomerSupportZalo/docs/SRS.md): Mô tả chi tiết các yêu cầu chức năng (FR-01 đến FR-07), phi chức năng và môi trường vận hành.
+- 🏗️ [**Software Architecture Document (SAD)**](file:///d:/Projects/CustomerSupportZalo/docs/SAD.md): Mô tả sơ đồ kiến trúc phân tầng, máy trạng thái Ticket, sơ đồ cơ sở dữ liệu SQLite ERD và hướng dẫn cho lập trình viên mở rộng.
+
+---
+
 ## Tính Năng Nổi Bật
 
 - **Cấu hình môi trường bảo mật (.env)**: Tách biệt cấu hình khóa bảo mật và thông tin nhạy cảm khỏi mã nguồn chính. Cung cấp tệp `.env.example` và thiết lập `.gitignore` đầy đủ để tránh sơ suất đẩy khóa bí mật lên Git repository.
