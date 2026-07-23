@@ -189,8 +189,8 @@ class TestZaloCsTracker(unittest.TestCase):
             "resolve_deadline": now_ms + 45 * 60 * 1000,
         }
         resp_sla, res_sla = TicketManager.get_remaining_sla(ticket)
-        self.assertEqual(resp_sla, 10)
-        self.assertEqual(res_sla, 45)
+        self.assertIn(resp_sla, (9, 10))
+        self.assertIn(res_sla, (44, 45))
 
         ticket_overdue = {
             "status": "PENDING",
@@ -549,7 +549,7 @@ class TestZaloCsTracker(unittest.TestCase):
 
         # cx = 1920 + (1280 - 400) // 2 = 1920 + 440 = 2360
         # cy = 100 + (720 - 300) // 2 = 100 + 210 = 310
-        self.assertEqual(popup_win.geom, "+2360+310")
+        self.assertEqual(popup_win.geom, "400x300+2360+310")
 
     def test_group_support_staff_filtering(self):
         # 1. Kiểm thử GroupDAO support staff

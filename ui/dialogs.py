@@ -10,10 +10,25 @@ def center_window_over_parent(dlg, parent=None):
     
     dw = dlg.winfo_width()
     dh = dlg.winfo_height()
-    if dw <= 1:
-        dw = dlg.winfo_reqwidth()
-    if dh <= 1:
-        dh = dlg.winfo_reqheight()
+    if dw <= 100 or dh <= 100:
+        req_w = dlg.winfo_reqwidth()
+        req_h = dlg.winfo_reqheight()
+        if req_w > 100:
+            dw = req_w
+        if req_h > 100:
+            dh = req_h
+
+    # Thử đọc kích thước đã thiết lập trên dlg.geometry()
+    try:
+        geom_str = dlg.geometry().split("+")[0]
+        if "x" in geom_str:
+            w_s, h_s = geom_str.split("x")
+            if int(w_s) > 100:
+                dw = int(w_s)
+            if int(h_s) > 100:
+                dh = int(h_s)
+    except Exception:
+        pass
 
     if parent and parent.winfo_exists():
         parent.update_idletasks()
@@ -30,7 +45,7 @@ def center_window_over_parent(dlg, parent=None):
         cx = max(0, (sw - dw) // 2)
         cy = max(0, (sh - dh) // 2)
 
-    dlg.geometry(f"+{cx}+{cy}")
+    dlg.geometry(f"{dw}x{dh}+{cx}+{cy}")
 
 class LoginDialog(tk.Toplevel):
     def __init__(self, zalo_service, parent=None):
