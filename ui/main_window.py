@@ -262,15 +262,16 @@ class MainWindow(tk.Tk):
         self.ticket_sla_label = tk.Label(header_frame, text="", font=("Arial", 9, "bold"), justify="left", anchor="w", wraplength=320)
         self.ticket_sla_label.pack(fill="x", anchor="w", pady=(2, 0))
         
-        # Cây phản hồi sử dụng ttk.Treeview
-        self.response_tree = ttk.Treeview(right_frame, show="tree")
+        # Cây phản hồi sử dụng ttk.Treeview với chiều cao dòng thoáng hơn (rowheight=32)
+        style.configure("ResponseTree.Treeview", rowheight=32, font=("Arial", 10))
+        self.response_tree = ttk.Treeview(right_frame, show="tree", style="ResponseTree.Treeview")
         self.response_tree.pack(fill="both", expand=True, pady=(0, 10))
         self.response_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
         
         # Cấu hình màu nền và chữ cho các trạng thái trên cây
         self.response_tree.tag_configure("needs_review", background="#FFF3CD")
         self.response_tree.tag_configure("RESOLVED", foreground="#7F8C8D")
-        self.response_tree.tag_configure("PROCESSING", foreground="#2C3E50", font=("Arial", 9, "bold"))
+        self.response_tree.tag_configure("PROCESSING", foreground="#2C3E50", font=("Arial", 10, "bold"))
 
         # Nút Hành động
         btn_frame = ttk.Frame(right_frame)
