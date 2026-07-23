@@ -573,7 +573,7 @@ class MainWindow(tk.Tk):
         group_name = selected_group["name"] if selected_group else f"Nhóm {self.selected_group_id}"
 
         from ui.dialogs import StaffManagementDialog
-        dialog = StaffManagementDialog(self.selected_group_id, group_name, self.zalo_service, parent=self)
+        dialog = StaffManagementDialog(self.selected_group_id, group_name, self.core.zalo_service, parent=self)
         dialog.deiconify()
         dialog.lift()
         dialog.focus_force()
