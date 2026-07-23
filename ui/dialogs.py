@@ -419,7 +419,7 @@ class StaffManagementDialog(tk.Toplevel):
         main_frame.pack(fill="both", expand=True)
 
         ttk.Label(main_frame, text=f"Tích chọn Nhân viên Hỗ trợ cho {self.group_name}:", font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
-        ttk.Label(main_frame, text="* Chỉ tin nhắn từ các nhân viên được tích chọn mới được tính là tiếp nhận/xử lý Ticket.", font=("Arial", 8, "italic"), fg="#7F8C8D", wraplength=420).pack(anchor="w", pady=(0, 10))
+        tk.Label(main_frame, text="* Chỉ tin nhắn từ các nhân viên được tích chọn mới được tính là tiếp nhận/xử lý Ticket.", font=("Arial", 8, "italic"), fg="#7F8C8D", justify="left", anchor="w", wraplength=420).pack(anchor="w", pady=(0, 10))
 
         # Search Bar & Add Manual Name
         search_frame = ttk.Frame(main_frame)
