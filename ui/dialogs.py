@@ -380,3 +380,101 @@ class GroupSelectDialog(tk.Toplevel):
 
     def get_selected_groups(self):
         return self.result
+
+class StaffManagementDialog(tk.Toplevel):
+    def __init__(self, group_id, group_name, zalo_service=None, parent=None):
+        super().__init__(parent)
+        self.title(f"Quản lý Nhân Viên Hỗ Trợ - {group_name}")
+        self.geometry("460x540")
+        self.resizable(False, False)
+        
+        self.group_id = group_id
+        self.group_name = group_name
+        self.zalo_service = zalo_service
+        self.result = None
+
+        self.transient(parent)
+        self.grab_set()
+
+        self.init_ui()
+        center_window_over_parent(self, parent)
+
+    def init_ui(self):
+        main_frame = ttk.Frame(self, padding="15")
+        main_frame.pack(fill="both", expand=True)
+
+        ttk.Label(main_frame, text=f"Tích chọn Nhân viên Hỗ trợ cho {self.group_name}:", font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
+        ttk.Label(main_frame, text="* Chỉ tin nhắn từ các nhân viên được tích chọn mới được tính là tiếp nhận/xử lý Ticket.", font=("Arial", 8, "italic"), fg="#7F8C8D", wraplength=420).pack(anchor="w", pady=(0, 10))
+
+        # Search Bar
+        search_frame = ttk.Frame(main_frame)
+        search_frame.pack(fill="x", pady=(0, 8))
+        ttk.Label(search_frame, text="🔍 Tìm tên:").pack(side="left", padx=(0, 5))
+        self.search_var = tk.StringVar()
+        self.search_var.trace("w", lambda *args: self.filter_members())
+        search_entry = ttk.Entry(search_frame, textvariable=self.search_var)
+        search_entry.pack(side="left", fill="x", expand=True)
+
+        # Container listbox frame with canvas/scrollbar
+        list_container = ttk.LabelFrame(main_frame, text="Danh sách thành viên nhóm", padding="5")
+        list_container.pack(fill="both", expand=True, pady=(0, 10))
+
+        canvas = tk.Canvas(list_container, highlightthickness=0, bg="white")
+        scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
+        self.scrollable_frame = ttk.Frame(canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Load members & current staff
+        from database import GroupDAO
+        current_staff = set(GroupDAO.get_group_support_staff(self.group_id))
+        
+        all_members = []
+        if self.zalo_service and hasattr(self.zalo_service, "fetch_group_members"):
+            all_members = self.zalo_service.fetch_group_members(self.group_id)
+        if not all_members:
+            all_members = sorted(list(current_staff)) or ["Admin", "KTV Hỗ Trợ"]
+
+        self.member_vars = {}
+        self.check_widgets = []
+
+        for name in all_members:
+            var = tk.BooleanVar(value=(name in current_staff))
+            cb = ttk.Checkbutton(self.scrollable_frame, text=name, variable=var)
+            cb.pack(anchor="w", pady=2, padx=5)
+            self.member_vars[name] = (var, cb)
+
+        # Buttons
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(fill="x")
+
+        ttk.Button(btn_frame, text="💾 Lưu danh sách Nhân viên", command=self.on_save).pack(side="left", padx=(0, 10))
+        ttk.Button(btn_frame, text="Hủy", command=self.destroy).pack(side="left")
+
+    def filter_members(self):
+        query = self.search_var.get().strip().lower()
+        for name, (var, cb) in self.member_vars.items():
+            if not query or query in name.lower():
+                cb.pack(anchor="w", pady=2, padx=5)
+            else:
+                cb.pack_forget()
+
+    def on_save(self):
+        selected_staff = [name for name, (var, cb) in self.member_vars.items() if var.get()]
+        from database import GroupDAO
+        GroupDAO.set_group_support_staff(self.group_id, selected_staff)
+        self.result = selected_staff
+        messagebox.showinfo("Thành công", f"Đã lưu {len(selected_staff)} nhân viên hỗ trợ cho nhóm {self.group_name}.")
+        self.destroy()
+
+    def get_data(self):
+        return self.result

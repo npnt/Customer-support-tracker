@@ -413,6 +413,56 @@ class ZaloService:
         # Trả về danh sách rỗng do thư viện zlapi hiện tại không hỗ trợ API fetchThreadMessages để lấy tin nhắn cũ
         return []
 
+    def fetch_group_members(self, group_id):
+        """
+        Lấy danh sách tên thành viên trong nhóm Zalo.
+        Ưu tiên lấy từ API ZaloWeb, sau đó kết hợp danh sách người gửi đã lưu trong DB.
+        """
+        members = set()
+        gid_str = str(group_id)
+
+        # 1. Gọi Zalo API nếu có
+        if self.client and ZALO_AVAILABLE:
+            try:
+                info = self.client.fetchGroupInfo(gid_str)
+                if info and isinstance(info, dict):
+                    mem_list = info.get("memInfo") or info.get("members") or info.get("memList") or []
+                    if isinstance(mem_list, list):
+                        for m in mem_list:
+                            name = None
+                            if isinstance(m, dict):
+                                name = m.get("dName") or m.get("name") or m.get("displayName")
+                            elif hasattr(m, "dName"):
+                                name = getattr(m, "dName", None)
+                            if name and str(name).strip():
+                                members.add(str(name).strip())
+            except Exception as req_err:
+                logger.debug(f"fetch_group_members API call lỗi: {req_err}")
+
+        # 2. Lấy thêm tên người gửi tin nhắn từ DB
+        try:
+            from database import get_connection
+            with get_connection() as conn:
+                rows = conn.execute(
+                    "SELECT DISTINCT sender_name FROM messages WHERE group_id = ? AND sender_name IS NOT NULL AND trim(sender_name) != ''",
+                    (gid_str,)
+                ).fetchall()
+                for r in rows:
+                    members.add(r["sender_name"].strip())
+        except Exception:
+            pass
+
+        # 3. Thêm các tên nhân viên hỗ trợ đã được cấu hình
+        try:
+            from database import GroupDAO
+            staff_list = GroupDAO.get_group_support_staff(gid_str)
+            for s in staff_list:
+                members.add(s)
+        except Exception:
+            pass
+
+        return sorted(list(members))
+
     def fetch_all_groups(self):
         if not self.client or not ZALO_AVAILABLE:
             return [

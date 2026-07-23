@@ -138,26 +138,28 @@ class TicketManager:
             if chosen_ticket_id:
                 TicketDAO.set_ticket_review(chosen_ticket_id, 1)
 
+        is_support_staff = GroupDAO.is_support_staff(group_id, sender_name)
+
         if chosen_ticket_id:
-            TicketDAO.add_response(
-                ticket_id=chosen_ticket_id,
-                response_msg_id=msg_id,
-                responder_name=sender_name,
-                response_content=content,
-                created_at=timestamp
-            )
-
             ticket = TicketDAO.get_ticket_by_id(chosen_ticket_id)
-            if ticket and ticket["status"] == "PENDING":
-                # Chỉ chuyển trạng thái PENDING -> PROCESSING (Đã tiếp nhận) nếu người gửi phản hồi KHÁC với người tạo Yêu cầu (Khách hàng)
-                requester_clean = str(ticket["requester_name"]).strip().lower()
-                responder_clean = str(sender_name).strip().lower()
+            requester_clean = str(ticket["requester_name"]).strip().lower() if ticket else ""
+            responder_clean = str(sender_name).strip().lower()
 
-                if responder_clean != requester_clean:
+            # Chỉ lưu vào lịch sử phản hồi KTV và tiếp nhận Ticket nếu người gửi LÀ Nhân viên Hỗ trợ đã đăng ký
+            if responder_clean != requester_clean and is_support_staff:
+                TicketDAO.add_response(
+                    ticket_id=chosen_ticket_id,
+                    response_msg_id=msg_id,
+                    responder_name=sender_name,
+                    response_content=content,
+                    created_at=timestamp
+                )
+
+                if ticket and ticket["status"] == "PENDING":
                     TicketDAO.update_ticket_status(chosen_ticket_id, "PROCESSING", acknowledged_at=timestamp)
                     logger.info(f"Ticket #{chosen_ticket_id} đã được tiếp nhận bởi KTV/Admin {sender_name}. Chuyển sang PROCESSING.")
-                else:
-                    logger.info(f"Ticket #{chosen_ticket_id}: Nhận thêm ảnh/thông tin bổ sung từ chính khách hàng {sender_name}. Giữ nguyên trạng thái PENDING.")
+            else:
+                logger.info(f"Ticket #{chosen_ticket_id}: Nhận thêm thông tin từ {sender_name} (không phải Nhân viên Hỗ trợ). Giữ nguyên trạng thái PENDING.")
 
             MessageDAO.update_classification(msg_id, "RESPONSE", confidence, final_needs_review, chosen_ticket_id)
             

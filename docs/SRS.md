@@ -2,7 +2,7 @@
 ## Hệ Thống Zalo Customer Support Tracker
 
 - **Tên dự án**: Zalo Customer Support Tracker
-- **Phiên bản**: 1.0.0 (Baseline Release)
+- **Phiên bản**: 1.1.0
 - **Ngày phát hành**: 23/07/2026
 - **Trạng thái**: Hoàn thiện & Sẵn sàng vận hành
 
@@ -16,6 +16,7 @@ Tài liệu **Software Requirements Specification (SRS)** định nghĩa đầy 
 ### 1.2 Phạm vi hệ thống
 Hệ thống **Zalo Customer Support Tracker** là ứng dụng Desktop hỗ trợ bộ phận Chăm sóc khách hàng (CS), Kỹ thuật viên (KTV) và Quản lý doanh nghiệp:
 - Đăng nhập và tự động đồng bộ danh sách nhóm chat Zalo Web.
+- Quản lý danh sách thành viên nhóm và phân công Nhân viên Hỗ trợ theo từng nhóm Zalo.
 - Theo dõi tin nhắn hỗ trợ từ khách hàng theo thời gian thực (Real-time Live Listener).
 - Sử dụng AI (Google Gemini AI / Rule Engine) để tự động phân loại bản chất tin nhắn: Yêu cầu mới (`REQUEST`), Phản hồi hỗ trợ (`RESPONSE`), hoặc Xác nhận hoàn thành (`RESOLVE`).
 - Đếm ngược hạn cam kết chất lượng dịch vụ SLA Tiếp nhận (Response SLA) và SLA Hoàn thành (Resolve SLA).
@@ -46,7 +47,7 @@ Hệ thống **Zalo Customer Support Tracker** là ứng dụng Desktop hỗ tr�
 
 ### FR-04: Quản Lý Vòng Đời Ticket (Ticket Lifecycle)
 - **FR-04.1**: Tạo Ticket mới ở trạng thái `PENDING` khi nhận tin nhắn `REQUEST` từ khách hàng.
-- **FR-04.2**: Chuyển Ticket sang `PROCESSING` khi KTV/Admin gửi phản hồi (`RESPONSE`).
+- **FR-04.2**: Chuyển Ticket sang `PROCESSING` khi Nhân viên Hỗ trợ được phân công gửi phản hồi (`RESPONSE`).
 - **FR-04.3**: Chuyển Ticket sang `RESOLVED` khi:
   - Khách hàng gửi tin nhắn `RESOLVE` (AI tự động đóng Ticket với `auto_resolved = 1` và icon `🤖`).
   - Người dùng bấm nút check `✅ Đóng Yêu Cầu` thủ công (đóng Ticket bởi người dùng với icon `✅`).
@@ -70,11 +71,16 @@ Hệ thống **Zalo Customer Support Tracker** là ứng dụng Desktop hỗ tr�
 - **FR-06.3**: **Tab Thống Kê Nhân Viên Hỗ Trợ**:
   - Cung cấp Dropdown chọn lọc nhân viên theo từng Nhóm Zalo cụ thể hoặc tất cả các nhóm.
   - Bảng dữ liệu hiển thị các cột: `Nhân Viên / KTV Hỗ Trợ`, `Đã Tiếp Nhận`, `Đã Hoàn Thành (Resolved)`, `Ticket Quá Hạn Xử Lý`, `Ticket Đang Open`.
-  - Thẻ KPI và biểu đồ cột năng suất nhân viên.
+  - Thẻ KPI và biểu đồ cột năng suất nhân viên chỉ lọc hiển thị các nhân viên thuộc danh sách được phân công.
 
 ### FR-07: Giao Diện Multi-Monitor & Lưu Trạng Thái Ứng Dụng
 - **FR-07.1**: Tự động lưu kích thước và vị trí cửa sổ ứng dụng vào `app_config.json` khi thoát chương trình và khôi phục khi khởi động lại.
-- **FR-07.2**: Tự động canh giữa tất cả các cửa sổ Popup dialog (`LoginDialog`, `SlaSettingsDialog`, `GroupSelectDialog`, `DashboardWindow`) đè lên cửa sổ chính trên bất kỳ màn hình nào trong hệ thống đa màn hình (Multi-monitor setups).
+- **FR-07.2**: Tự động canh giữa tất cả các cửa sổ Popup dialog (`LoginDialog`, `SlaSettingsDialog`, `GroupSelectDialog`, `StaffManagementDialog`, `DashboardWindow`) đè lên cửa sổ chính trên bất kỳ màn hình nào trong hệ thống đa màn hình (Multi-monitor setups).
+
+### FR-08: Quản Lý Nhân Viên Hỗ Trợ Theo Nhóm Zalo (Support Staff Management)
+- **FR-08.1**: Lấy danh sách toàn bộ thành viên của từng nhóm Zalo (`fetch_group_members`).
+- **FR-08.2**: Cho phép chọn và lưu danh sách Nhân viên Hỗ trợ của nhóm qua cửa sổ `StaffManagementDialog` (`👥 QL Nhân Viên`).
+- **FR-08.3**: Chỉ công nhận tin nhắn phản hồi từ các nhân viên này là tin tiếp nhận/xử lý Ticket. Tin nhắn từ người khác giữ nguyên Ticket ở trạng thái `PENDING`.
 
 ---
 
@@ -91,11 +97,3 @@ Hệ thống **Zalo Customer Support Tracker** là ứng dụng Desktop hỗ tr�
 ### NFR-03: Bảo Mật (Security & Privacy)
 - Không chia sẻ Cookie Zalo session hay thông tin tài khoản ra ngoài.
 - File `.env`, `zalo_session.json` và cơ sở dữ liệu SQLite local được loại trừ khỏi Git repository qua `.gitignore`.
-
----
-
-## 4. Môi Trường Vận Hành (Operating Environment)
-- **Hệ điều hành**: Windows 10/11 (khuyên dùng), macOS, Linux.
-- **Ngôn ngữ lập trình**: Python >= 3.12.
-- **Trình duyệt tự động**: Chromium (Playwright).
-- **Cơ sở dữ liệu**: SQLite 3 (Tích hợp sẵn trong Python standard library).

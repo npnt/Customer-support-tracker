@@ -551,5 +551,44 @@ class TestZaloCsTracker(unittest.TestCase):
         # cy = 100 + (720 - 300) // 2 = 100 + 210 = 310
         self.assertEqual(popup_win.geom, "+2360+310")
 
+    def test_group_support_staff_filtering(self):
+        # 1. Kiểm thử GroupDAO support staff
+        gid = "g_staff_test"
+        GroupDAO.add_group(gid, "Group Staff Test", 1)
+        
+        # Ban đầu chưa phân công ➔ is_support_staff trả về True (tương thích ngược)
+        self.assertTrue(GroupDAO.is_support_staff(gid, "KTV Bat Ky"))
+
+        # Phân công danh sách Nhân viên Hỗ trợ
+        GroupDAO.set_group_support_staff(gid, ["KTV Chinh A", "KTV Chinh B"])
+        staff_list = GroupDAO.get_group_support_staff(gid)
+        self.assertEqual(staff_list, ["KTV Chinh A", "KTV Chinh B"])
+
+        self.assertTrue(GroupDAO.is_support_staff(gid, "KTV Chinh A"))
+        self.assertFalse(GroupDAO.is_support_staff(gid, "Khách Hàng X"))
+
+        # 2. Kiểm thử TicketManager.process_response khi khách/người không thuộc danh sách phản hồi
+        now_ms = int(time.time() * 1000)
+        req_msg = {"msg_id": "m_staff_req", "group_id": gid, "sender_id": "c_staff", "sender_name": "Khách Hàng X", "content": "Cần hỗ trợ gấp", "timestamp": now_ms}
+        MessageDAO.save_message(req_msg["msg_id"], req_msg["group_id"], req_msg["sender_id"], req_msg["sender_name"], req_msg["content"], req_msg["timestamp"])
+        tid = self.tm.process_request(req_msg, 0.95, 0)
+
+        # Phản hồi từ Khách Hàng X (Không phải KTV) ➔ Giữ nguyên PENDING
+        non_staff_resp = {"msg_id": "m_non_staff", "group_id": gid, "sender_id": "c_staff", "sender_name": "Khách Hàng X", "content": "Tin nhắn gửi thêm", "timestamp": now_ms + 1000}
+        MessageDAO.save_message(non_staff_resp["msg_id"], non_staff_resp["group_id"], non_staff_resp["sender_id"], non_staff_resp["sender_name"], non_staff_resp["content"], non_staff_resp["timestamp"])
+        self.tm.process_response(non_staff_resp, target_ticket_id=tid, confidence=0.9, needs_review=0)
+
+        t_after_non_staff = TicketDAO.get_ticket_by_id(tid)
+        self.assertEqual(t_after_non_staff["status"], "PENDING")
+
+        # Phản hồi từ KTV Chinh A (Là KTV được phân công) ➔ Tiếp nhận, chuyển sang PROCESSING
+        staff_resp = {"msg_id": "m_valid_staff", "group_id": gid, "sender_id": "ktv_a", "sender_name": "KTV Chinh A", "content": "Chào anh, tôi đang xử lý", "timestamp": now_ms + 2000}
+        MessageDAO.save_message(staff_resp["msg_id"], staff_resp["group_id"], staff_resp["sender_id"], staff_resp["sender_name"], staff_resp["content"], staff_resp["timestamp"])
+        self.tm.process_response(staff_resp, target_ticket_id=tid, confidence=0.9, needs_review=0)
+
+        t_after_staff = TicketDAO.get_ticket_by_id(tid)
+        self.assertEqual(t_after_staff["status"], "PROCESSING")
+        self.assertIsNotNone(t_after_staff["acknowledged_at"])
+
 if __name__ == "__main__":
     unittest.main()

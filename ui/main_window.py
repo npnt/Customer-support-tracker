@@ -215,8 +215,14 @@ class MainWindow(tk.Tk):
         self.group_listbox.pack(fill="both", expand=True, pady=(0, 10))
         self.group_listbox.bind("<<ListboxSelect>>", self.on_group_selected)
         
-        self.sla_settings_btn = ttk.Button(left_frame, text="⚙️ Thiết lập SLA nhóm", command=self.on_sla_clicked, state="disabled")
-        self.sla_settings_btn.pack(fill="x", pady=(0, 15))
+        group_btn_frame = ttk.Frame(left_frame)
+        group_btn_frame.pack(fill="x", pady=(0, 15))
+
+        self.sla_settings_btn = ttk.Button(group_btn_frame, text="⚙️ Thiết lập SLA", command=self.on_sla_clicked, state="disabled")
+        self.sla_settings_btn.pack(side="left", fill="x", expand=True, padx=(0, 4))
+
+        self.manage_staff_btn = ttk.Button(group_btn_frame, text="👥 QL Nhân Viên", command=self.on_manage_staff_clicked, state="disabled")
+        self.manage_staff_btn.pack(side="left", fill="x", expand=True)
 
         # Khung Đăng nhập / Kết nối
         conn_frame = ttk.LabelFrame(left_frame, text="Zalo Connection", padding="8")
@@ -528,6 +534,7 @@ class MainWindow(tk.Tk):
         if not selection:
             self.selected_group_id = None
             self.sla_settings_btn.configure(state="disabled")
+            self.manage_staff_btn.configure(state="disabled")
             return
             
         idx = selection[0]
@@ -535,8 +542,25 @@ class MainWindow(tk.Tk):
         if idx < len(tracked_groups):
             self.selected_group_id = tracked_groups[idx]["id"]
             self.sla_settings_btn.configure(state="normal")
+            self.manage_staff_btn.configure(state="normal")
             self.refresh_ticket_list()
             self.refresh_supported_tickets_tree()
+
+    def on_manage_staff_clicked(self):
+        if not self.selected_group_id:
+            messagebox.showwarning("Cảnh báo", "Vui lòng chọn một nhóm Zalo trong danh sách.")
+            return
+
+        tracked_groups = GroupDAO.get_tracked_groups()
+        selected_group = next((g for g in tracked_groups if str(g["id"]) == str(self.selected_group_id)), None)
+        group_name = selected_group["name"] if selected_group else f"Nhóm {self.selected_group_id}"
+
+        from ui.dialogs import StaffManagementDialog
+        dialog = StaffManagementDialog(self.selected_group_id, group_name, self.zalo_service, parent=self)
+        self.wait_window(dialog)
+
+        self.refresh_ticket_list()
+        self.refresh_supported_tickets_tree()
 
     def update_ticket_header_info(self, ticket=None):
         if ticket is None:

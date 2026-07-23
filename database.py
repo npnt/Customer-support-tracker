@@ -82,9 +82,61 @@ def initialize_database():
             FOREIGN KEY(ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
         );
         """)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS group_support_staff (
+            group_id TEXT NOT NULL,
+            staff_name TEXT NOT NULL,
+            PRIMARY KEY (group_id, staff_name),
+            FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+        );
+        """)
         conn.commit()
 
 class GroupDAO:
+    @staticmethod
+    def get_group_support_staff(group_id):
+        gid_str = str(group_id).strip() if group_id is not None else ""
+        if not gid_str:
+            return []
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT staff_name FROM group_support_staff WHERE group_id = ? ORDER BY staff_name ASC",
+                (gid_str,)
+            ).fetchall()
+            return [row["staff_name"] for row in rows]
+
+    @staticmethod
+    def set_group_support_staff(group_id, staff_names):
+        gid_str = str(group_id).strip() if group_id is not None else ""
+        if not gid_str:
+            return
+        GroupDAO.add_group(gid_str, f"Nhóm {gid_str}", is_tracked=0)
+        clean_names = sorted(list(set(str(name).strip() for name in staff_names if name and str(name).strip())))
+        with get_connection() as conn:
+            conn.execute("DELETE FROM group_support_staff WHERE group_id = ?", (gid_str,))
+            for name in clean_names:
+                conn.execute(
+                    "INSERT OR REPLACE INTO group_support_staff (group_id, staff_name) VALUES (?, ?)",
+                    (gid_str, name)
+                )
+            conn.commit()
+
+    @staticmethod
+    def is_support_staff(group_id, staff_name):
+        gid_str = str(group_id).strip() if group_id is not None else ""
+        sname = str(staff_name).strip() if staff_name is not None else ""
+        if not gid_str or not sname:
+            return True
+        with get_connection() as conn:
+            staff_list = [row["staff_name"] for row in conn.execute(
+                "SELECT staff_name FROM group_support_staff WHERE group_id = ?", (gid_str,)
+            ).fetchall()]
+
+            # Nếu nhóm chưa từng được phân công nhân viên hỗ trợ ➔ Mặc định chấp nhận tất cả (tương thích ngược)
+            if not staff_list:
+                return True
+            return sname in staff_list
+
     @staticmethod
     def add_group(group_id, name, is_tracked=0):
         if not group_id or not str(group_id).strip():
@@ -488,21 +540,37 @@ class TicketDAO:
         now_ms = int(time.time() * 1000)
 
         with get_connection() as conn:
-            # Lấy danh sách tất cả nhân viên gửi phản hồi (lọc theo group_id nếu có)
+            # Lấy danh sách nhân viên hỗ trợ từ bảng group_support_staff (nếu có cấu hình)
             if gid_str:
-                staff_rows = conn.execute(
-                    """SELECT DISTINCT r.responder_name as staff_name 
-                       FROM responses r 
-                       JOIN tickets t ON r.ticket_id = t.id 
-                       WHERE t.group_id = ? AND r.responder_name IS NOT NULL AND trim(r.responder_name) != ''""",
+                assigned_rows = conn.execute(
+                    "SELECT staff_name FROM group_support_staff WHERE group_id = ? ORDER BY staff_name ASC",
                     (gid_str,)
                 ).fetchall()
+                if assigned_rows:
+                    staff_names = [r["staff_name"] for r in assigned_rows]
+                else:
+                    staff_rows = conn.execute(
+                        """SELECT DISTINCT r.responder_name as staff_name 
+                           FROM responses r 
+                           JOIN tickets t ON r.ticket_id = t.id 
+                           WHERE t.group_id = ? AND r.responder_name IS NOT NULL AND trim(r.responder_name) != ''""",
+                        (gid_str,)
+                    ).fetchall()
+                    staff_names = sorted(list(set(row["staff_name"] for row in staff_rows)))
             else:
-                staff_rows = conn.execute(
-                    """SELECT DISTINCT responder_name as staff_name FROM responses WHERE responder_name IS NOT NULL AND trim(responder_name) != ''"""
+                assigned_rows = conn.execute(
+                    """SELECT DISTINCT gss.staff_name 
+                       FROM group_support_staff gss 
+                       JOIN groups g ON gss.group_id = g.id 
+                       WHERE g.is_tracked = 1 ORDER BY gss.staff_name ASC"""
                 ).fetchall()
-            
-            staff_names = sorted(list(set(row["staff_name"] for row in staff_rows)))
+                if assigned_rows:
+                    staff_names = [r["staff_name"] for r in assigned_rows]
+                else:
+                    staff_rows = conn.execute(
+                        """SELECT DISTINCT responder_name as staff_name FROM responses WHERE responder_name IS NOT NULL AND trim(responder_name) != ''"""
+                    ).fetchall()
+                    staff_names = sorted(list(set(row["staff_name"] for row in staff_rows)))
             
             for sname in staff_names:
                 if gid_str:
