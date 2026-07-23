@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+.venv/
+ENV/
+env/
+active_env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific files (Bảo mật thông tin đăng nhập và database)
+.env
+zalo_session.json
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Thư mục logs và backups
+logs/
+backups/
+
+# Test databases
+test_zalo_cs_tracker.db
+test_zalo_cs_tracker.db-journal
+test_zalo_cs_tracker.db-wal
+test_zalo_cs_tracker.db-shm

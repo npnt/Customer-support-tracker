@@ -1,0 +1,7 @@
+google-generativeai>=0.3.0
+selenium>=4.0.0
+python-dotenv>=1.0.0
+# zlapi có thể cài qua pip: pip install zlapi
+# Hoặc cài bản mới nhất từ Github nếu bản trên PyPI gặp lỗi:
+# git+https://github.com/Its-VrxxDev/zlapi.git
+zlapi
