@@ -221,7 +221,7 @@ class MainWindow(tk.Tk):
         self.sla_settings_btn = ttk.Button(group_btn_frame, text="⚙️ Thiết lập SLA", command=self.on_sla_clicked, state="disabled")
         self.sla_settings_btn.pack(side="left", fill="x", expand=True, padx=(0, 4))
 
-        self.manage_staff_btn = ttk.Button(group_btn_frame, text="👥 QL Nhân Viên", command=self.on_manage_staff_clicked, state="disabled")
+        self.manage_staff_btn = ttk.Button(group_btn_frame, text="👥 QL Nhân Viên", command=self.on_manage_staff_clicked, state="normal")
         self.manage_staff_btn.pack(side="left", fill="x", expand=True)
 
         # Khung Đăng nhập / Kết nối
@@ -332,6 +332,12 @@ class MainWindow(tk.Tk):
         system_menu.add_command(label="Thoát", command=self.on_close)
         menubar.add_cascade(label="Hệ thống", menu=system_menu)
         
+        # Menu Cấu hình
+        config_menu = tk.Menu(menubar, tearoff=0)
+        config_menu.add_command(label="👥 Quản lý Nhân Viên Hỗ Trợ", command=self.on_manage_staff_clicked)
+        config_menu.add_command(label="⚙️ Thiết lập SLA Nhóm Zalo", command=self.on_sla_clicked)
+        menubar.add_cascade(label="Cấu hình", menu=config_menu)
+
         # Menu Báo cáo & Thống kê
         report_menu = tk.Menu(menubar, tearoff=0)
         report_menu.add_command(label="📊 Dashboard Báo Cáo SLA & Đánh Giá Hỗ Trợ", command=self.on_open_dashboard)

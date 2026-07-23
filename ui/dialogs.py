@@ -397,17 +397,25 @@ class GroupSelectDialog(tk.Toplevel):
         return self.result
 
 class StaffManagementDialog(tk.Toplevel):
-    def __init__(self, group_id, group_name, zalo_service=None, parent=None):
+    def __init__(self, group_id=None, group_name=None, zalo_service=None, parent=None):
         super().__init__(parent)
-        self.title(f"Quản lý Nhân Viên Hỗ Trợ - {group_name}")
-        self.geometry("460x540")
+        self.geometry("480x560")
         self.resizable(False, False)
         
+        from database import GroupDAO
+        self.tracked_groups = GroupDAO.get_tracked_groups()
+        
+        if not group_id and self.tracked_groups:
+            group_id = self.tracked_groups[0]["id"]
+            group_name = self.tracked_groups[0]["name"]
+
         self.group_id = group_id
-        self.group_name = group_name
+        self.group_name = group_name or f"Nhóm {group_id}"
         self.zalo_service = zalo_service
         self.result = None
+        self.member_vars = {}
 
+        self.title(f"Quản lý Nhân Viên Hỗ Trợ - {self.group_name}")
         self.transient(parent)
         self.grab_set()
 
@@ -418,8 +426,30 @@ class StaffManagementDialog(tk.Toplevel):
         main_frame = ttk.Frame(self, padding="15")
         main_frame.pack(fill="both", expand=True)
 
-        ttk.Label(main_frame, text=f"Tích chọn Nhân viên Hỗ trợ cho {self.group_name}:", font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
-        tk.Label(main_frame, text="* Chỉ tin nhắn từ các nhân viên được tích chọn mới được tính là tiếp nhận/xử lý Ticket.", font=("Arial", 8, "italic"), fg="#7F8C8D", justify="left", anchor="w", wraplength=420).pack(anchor="w", pady=(0, 10))
+        # 1. Combobox chọn nhóm Zalo
+        group_sel_frame = ttk.Frame(main_frame)
+        group_sel_frame.pack(fill="x", pady=(0, 10))
+
+        ttk.Label(group_sel_frame, text="📍 Nhóm Zalo:", font=("Arial", 9, "bold")).pack(side="left", padx=(0, 5))
+        
+        self.group_combo_vals = []
+        self.group_id_map = {}
+        selected_idx = 0
+
+        for idx, g in enumerate(self.tracked_groups):
+            disp = f"{g['name']} (ID: {g['id']})"
+            self.group_combo_vals.append(disp)
+            self.group_id_map[disp] = (g["id"], g["name"])
+            if str(g["id"]) == str(self.group_id):
+                selected_idx = idx
+
+        self.group_combo = ttk.Combobox(group_sel_frame, values=self.group_combo_vals, state="readonly")
+        if self.group_combo_vals:
+            self.group_combo.current(selected_idx)
+        self.group_combo.pack(side="left", fill="x", expand=True)
+        self.group_combo.bind("<<ComboboxSelected>>", self.on_group_combo_changed)
+
+        tk.Label(main_frame, text="* Chỉ tin nhắn từ các nhân viên được tích chọn mới được tính là tiếp nhận/xử lý Ticket.", font=("Arial", 8, "italic"), fg="#7F8C8D", justify="left", anchor="w", wraplength=440).pack(anchor="w", pady=(0, 10))
 
         # Search Bar & Add Manual Name
         search_frame = ttk.Frame(main_frame)
@@ -456,7 +486,31 @@ class StaffManagementDialog(tk.Toplevel):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Load members & current staff safely
+        # Buttons
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(fill="x")
+
+        ttk.Button(btn_frame, text="💾 Lưu danh sách Nhân viên", command=self.on_save).pack(side="left", padx=(0, 10))
+        ttk.Button(btn_frame, text="Hủy", command=self.destroy).pack(side="left")
+
+        if self.group_id:
+            self.load_group_members(self.group_id, self.group_name)
+
+    def on_group_combo_changed(self, event):
+        disp = self.group_combo.get()
+        if disp in self.group_id_map:
+            gid, gname = self.group_id_map[disp]
+            self.load_group_members(gid, gname)
+
+    def load_group_members(self, group_id, group_name):
+        self.group_id = group_id
+        self.group_name = group_name
+        self.title(f"Quản lý Nhân Viên Hỗ Trợ - {group_name}")
+
+        for name, (var, cb) in list(self.member_vars.items()):
+            cb.destroy()
+        self.member_vars.clear()
+
         from database import GroupDAO
         current_staff = set(GroupDAO.get_group_support_staff(self.group_id))
         
@@ -473,19 +527,13 @@ class StaffManagementDialog(tk.Toplevel):
         if not all_members:
             all_members = ["Admin", "KTV Hỗ Trợ"]
 
-        self.member_vars = {}
         for name in all_members:
             var = tk.BooleanVar(value=(name in current_staff))
             cb = ttk.Checkbutton(self.scrollable_frame, text=name, variable=var)
             cb.pack(anchor="w", pady=2, padx=5)
             self.member_vars[name] = (var, cb)
 
-        # Buttons
-        btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(fill="x")
-
-        ttk.Button(btn_frame, text="💾 Lưu danh sách Nhân viên", command=self.on_save).pack(side="left", padx=(0, 10))
-        ttk.Button(btn_frame, text="Hủy", command=self.destroy).pack(side="left")
+        self.filter_members()
 
     def on_add_manual_name(self):
         name = self.manual_name_entry.get().strip()
