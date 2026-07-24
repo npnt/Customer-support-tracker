@@ -699,5 +699,32 @@ class TestZaloCsTracker(unittest.TestCase):
         self.assertEqual(target_resps[0]["response_msg_id"], "m_m2")
         self.assertEqual(target_resps[0]["response_content"], "Anh báo giá máy in màu luôn nhé")
 
+    def test_reaction_sender_name_resolution(self):
+        # 1. Lưu tin nhắn trước đó của người dùng "Thuỷ Tiên" (ID: "u_thuy_tien")
+        now_ms = int(time.time() * 1000)
+        MessageDAO.save_message("m_text_1", "g_react_test", "u_thuy_tien", "Thuỷ Tiên", "Cần hỗ trợ gấp", now_ms)
+
+        # Kiểm tra tra cứu tên từ DB theo sender_id
+        resolved_name = MessageDAO.get_sender_name_by_id("u_thuy_tien")
+        self.assertEqual(resolved_name, "Thuỷ Tiên")
+
+        # 2. Giả lập tin nhắn thả cảm xúc/reaction chỉ có author_id mà không có tên trực tiếp trong payload
+        from zalo_service import ZaloBot
+        bot = ZaloBot.__new__(ZaloBot)
+        bot.known_live_groups = set()
+        bot.message_callback = None
+        
+        captured_messages = []
+        bot.message_callback = lambda mid, tid, aid, sname, content, ts: captured_messages.append({
+            "mid": mid, "thread_id": tid, "author_id": aid, "sender_name": sname, "content": content
+        })
+
+        # Bơm sự kiện reaction không có displayName trong payload
+        reaction_obj = {"uidFrom": "u_thuy_tien"}
+        bot.onMessage(mid="m_react_2", author_id="u_thuy_tien", message="❤️", message_object=reaction_obj, thread_id="g_react_test", thread_type=1, ts=now_ms + 1000)
+
+        self.assertEqual(len(captured_messages), 1)
+        self.assertEqual(captured_messages[0]["sender_name"], "Thuỷ Tiên")
+
 if __name__ == "__main__":
     unittest.main()

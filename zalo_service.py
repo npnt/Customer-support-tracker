@@ -90,12 +90,22 @@ class ZaloBot(ZaloAPI if ZALO_AVAILABLE else object):
         thread_id = str(thread_id) if thread_id is not None else ""
         author_id = str(author_id) if author_id is not None else ""
         
+        # Nếu author_id bị rỗng, trích xuất từ message_object / kwargs
+        if not author_id and message_object:
+            if isinstance(message_object, dict):
+                author_id = str(message_object.get("uidFrom") or message_object.get("srcId") or message_object.get("fromId") or message_object.get("authorId") or message_object.get("senderId") or message_object.get("userId") or "")
+            else:
+                author_id = str(getattr(message_object, "uidFrom", None) or getattr(message_object, "srcId", None) or getattr(message_object, "fromId", None) or getattr(message_object, "authorId", None) or getattr(message_object, "senderId", None) or "")
+
+        if not author_id and kwargs:
+            author_id = str(kwargs.get("author_id") or kwargs.get("sender_id") or kwargs.get("srcId") or "")
+
         # Xử lý an toàn biến content nếu message truyền vào là đối tượng MessageObject hoặc dict
         content = message
         if isinstance(content, str):
             pass
         elif isinstance(content, dict):
-            content = content.get("content") or content.get("title") or str(content)
+            content = content.get("content") or content.get("title") or content.get("text") or str(content)
         elif hasattr(content, "content") and not callable(getattr(content, "content")):
             content = getattr(content, "content") or str(content)
         elif content is not None:
@@ -103,7 +113,7 @@ class ZaloBot(ZaloAPI if ZALO_AVAILABLE else object):
         else:
             content = ""
 
-        sender_name = "Người dùng Zalo"
+        sender_name = None
         
         # Nếu ts không được truyền trực tiếp, trích xuất từ message_object
         if ts is None:
@@ -127,13 +137,44 @@ class ZaloBot(ZaloAPI if ZALO_AVAILABLE else object):
             else:
                 metadata = getattr(message_object, "metadata", None)
 
+        # Trích xuất sender_name từ tất cả các thuộc tính của payload Zalo (kể cả reaction, emotion, like, heart)
         if message_object:
             if isinstance(message_object, dict):
-                sender_name = message_object.get("dName") or message_object.get("senderName") or message_object.get("authorName") or sender_name
+                sender_name = (
+                    message_object.get("dName") or 
+                    message_object.get("displayName") or 
+                    message_object.get("senderName") or 
+                    message_object.get("authorName") or 
+                    message_object.get("srcName") or 
+                    message_object.get("fromName") or 
+                    message_object.get("userName") or 
+                    message_object.get("name") or 
+                    (isinstance(message_object.get("sender"), dict) and (message_object["sender"].get("dName") or message_object["sender"].get("displayName"))) or
+                    (isinstance(message_object.get("user"), dict) and (message_object["user"].get("dName") or message_object["user"].get("displayName")))
+                )
             else:
-                sender_name = getattr(message_object, "dName", None) or getattr(message_object, "senderName", None) or getattr(message_object, "authorName", None) or sender_name
+                sender_name = (
+                    getattr(message_object, "dName", None) or 
+                    getattr(message_object, "displayName", None) or 
+                    getattr(message_object, "senderName", None) or 
+                    getattr(message_object, "authorName", None) or 
+                    getattr(message_object, "srcName", None) or 
+                    getattr(message_object, "fromName", None) or 
+                    getattr(message_object, "userName", None) or 
+                    getattr(message_object, "name", None)
+                )
 
-        sender_name = str(sender_name) if sender_name is not None else "Người dùng Zalo"
+        if not sender_name and kwargs:
+            sender_name = kwargs.get("displayName") or kwargs.get("senderName") or kwargs.get("srcName") or kwargs.get("fromName")
+
+        # Nếu sender_name vẫn chưa tìm thấy hoặc là mặc định, tra cứu tên thật từ CSDL theo author_id
+        if (not sender_name or str(sender_name).strip() == "Người dùng Zalo") and author_id:
+            from database import MessageDAO
+            db_name = MessageDAO.get_sender_name_by_id(author_id)
+            if db_name:
+                sender_name = db_name
+
+        sender_name = str(sender_name).strip() if sender_name and str(sender_name).strip() else "Người dùng Zalo"
 
         # Chuẩn hóa tin nhắn đặc biệt
         if not content:
@@ -152,6 +193,15 @@ class ZaloBot(ZaloAPI if ZALO_AVAILABLE else object):
 
         if self.message_callback:
             self.message_callback(mid, thread_id, author_id, sender_name, content, ts)
+
+    def onReaction(self, reaction, message_id, author_id, thread_id, thread_type, message_object=None, **kwargs):
+        content = f"Thả cảm xúc {reaction}"
+        self.onMessage(mid=message_id, author_id=author_id, message=content, message_object=message_object, thread_id=thread_id, thread_type=thread_type, **kwargs)
+
+    def onEvent(self, event, event_data, thread_id, thread_type, message_object=None, **kwargs):
+        content = f"Sự kiện {event}"
+        author_id = kwargs.get("author_id") or (event_data.get("srcId") if isinstance(event_data, dict) else None)
+        self.onMessage(mid=kwargs.get("mid", ""), author_id=author_id, message=content, message_object=message_object or event_data, thread_id=thread_id, thread_type=thread_type, **kwargs)
 
     def onException(self, exception):
         logger.error(f"Zalo Client Exception: {exception}")

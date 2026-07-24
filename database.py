@@ -307,6 +307,22 @@ class MessageDAO:
             )
             conn.commit()
 
+    @staticmethod
+    def get_sender_name_by_id(sender_id):
+        if not sender_id:
+            return None
+        sid = str(sender_id).strip()
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT sender_name FROM messages 
+                   WHERE sender_id = ? AND sender_name IS NOT NULL 
+                     AND sender_name != '' AND sender_name != 'Người dùng Zalo' 
+                   ORDER BY timestamp DESC LIMIT 1""",
+                (sid,)
+            )
+            row = cursor.fetchone()
+            return row["sender_name"] if row else None
+
 class TicketDAO:
     @staticmethod
     def create_ticket(group_id, request_msg_id, requester_name, request_content, created_at, response_deadline, resolve_deadline, needs_review=0):
