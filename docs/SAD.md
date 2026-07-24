@@ -47,7 +47,7 @@ Hệ thống **Zalo Customer Support Tracker** được thiết kế theo mô h�
 ### 2.1 Tầng Giao Diện (Presentation / GUI Layer)
 - **`ui/main_window.py` (`MainWindow`)**:
   - Giao diện chính phân 3 cột (PanedWindow):
-    - **Cột 1 (Bên trái)**: Trạng thái kết nối, nút đăng nhập QR, nút `⚙️ Thiết lập SLA`, nút `👥 QL Nhân Viên` và danh sách các nhóm Zalo đang theo dõi (`group_listbox`).
+    - **Cột 1 (Bên trái)**: Trạng thái kết nối, nút đăng nhập QR, nút `⚙️ Thiết lập SLA`, nút `👥 QL Nhân Viên` và danh sách các nhóm Zalo đang theo dõi (`group_listbox` tô màu trực quan 3 mức độ trễ SLA: Cam `⚠️`, Tím `🛠️`, Đỏ `🚨`).
     - **Cột 2 (Ở giữa)**: Thẻ Ticket đang chờ hỗ trợ (`ticket_cards`) và Bảng tin nhắn thời gian thực (`live_tree`).
     - **Cột 3 (Bên phải)**: Header chi tiết thông tin Ticket kèm thời gian SLA xử lý đếm ngược (tô màu Đỏ/Vàng/Xanh), Cây phản hồi trao đổi 2 chiều (`response_tree` có `rowheight=32`), và bộ nút hành động (`✅ Đóng Yêu Cầu`, `🔓 Mở Lại Yêu Cầu`, `✂️ Tách Ticket`, `🔗 Gán Vào Ticket Khác`).
 - **`ui/dashboard.py` (`DashboardWindow`)**:

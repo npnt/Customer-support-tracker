@@ -436,6 +436,29 @@ class TicketDAO:
             return (row["cnt"] > 0) if row else False
 
     @staticmethod
+    def get_group_sla_overdue_status(group_id):
+        gid_str = str(group_id).strip() if group_id is not None else ""
+        if not gid_str:
+            return False, False
+        now_ms = int(time.time() * 1000)
+        with get_connection() as conn:
+            cur1 = conn.execute(
+                "SELECT COUNT(*) as cnt FROM tickets WHERE group_id = ? AND status = 'PENDING' AND response_deadline < ?",
+                (gid_str, now_ms)
+            )
+            r1 = cur1.fetchone()
+            has_response_overdue = (r1["cnt"] > 0) if r1 else False
+
+            cur2 = conn.execute(
+                "SELECT COUNT(*) as cnt FROM tickets WHERE group_id = ? AND status IN ('PENDING', 'PROCESSING') AND resolve_deadline < ?",
+                (gid_str, now_ms)
+            )
+            r2 = cur2.fetchone()
+            has_resolve_overdue = (r2["cnt"] > 0) if r2 else False
+
+            return has_response_overdue, has_resolve_overdue
+
+    @staticmethod
     def get_ticket_responses(ticket_id):
         with get_connection() as conn:
             cursor = conn.execute(

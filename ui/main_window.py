@@ -405,19 +405,12 @@ class MainWindow(tk.Tk):
         for idx, group in enumerate(tracked_groups):
             sla = GroupDAO.get_sla_settings(group["id"])
             pending_cnt, processing_cnt = TicketDAO.get_group_ticket_counts(group["id"])
-            has_overdue = TicketDAO.has_overdue_pending_tickets(group["id"])
-            
-            if has_overdue:
-                item_text = f"⚠️ [{pending_cnt}/{processing_cnt}] {group['name']} ({sla['max_response_time']}m/{sla['max_resolve_time']}m)"
-            else:
-                item_text = f"[{pending_cnt}/{processing_cnt}] {group['name']} ({sla['max_response_time']}m/{sla['max_resolve_time']}m)"
+            item_text, fg_color, bg_color = self.get_group_item_format(
+                group["id"], group["name"], pending_cnt, processing_cnt, sla["max_response_time"], sla["max_resolve_time"]
+            )
                 
             self.group_listbox.insert(tk.END, item_text)
-            
-            if has_overdue:
-                self.group_listbox.itemconfigure(idx, fg="#C0392B", bg="#FDEDEC", selectforeground="#C0392B")
-            else:
-                self.group_listbox.itemconfigure(idx, fg="#2C3E50", bg="white", selectforeground="#FFFFFF")
+            self.group_listbox.itemconfigure(idx, fg=fg_color, bg=bg_color, selectforeground=fg_color)
             
             if str(group["id"]) == str(old_selected_id):
                 self.group_listbox.selection_set(idx)
@@ -1043,18 +1036,42 @@ class MainWindow(tk.Tk):
         except Exception as e:
             logger.error(f"Lỗi khi thêm tin nhắn live vào Treeview: {e}")
 
+    def get_group_item_format(self, group_id, group_name, pending_cnt, processing_cnt, max_res_time, max_solve_time):
+        has_response_overdue, has_resolve_overdue = TicketDAO.get_group_sla_overdue_status(group_id)
+
+        if has_response_overdue and has_resolve_overdue:
+            prefix = "🚨"
+            fg_color = "#C0392B"  # Đỏ đậm
+            bg_color = "#FDEDEC"  # Hồng nhạt
+        elif has_response_overdue:
+            prefix = "⚠️"
+            fg_color = "#D35400"  # Cam đậm
+            bg_color = "#FDEBD0"  # Cam nhạt
+        elif has_resolve_overdue:
+            prefix = "🛠️"
+            fg_color = "#8E44AD"  # Tím đậm
+            bg_color = "#F4ECF7"  # Tím nhạt
+        else:
+            prefix = ""
+            fg_color = "#2C3E50"  # Mặc định
+            bg_color = "white"
+
+        if prefix:
+            item_text = f"{prefix} [{pending_cnt}/{processing_cnt}] {group_name} ({max_res_time}m/{max_solve_time}m)"
+        else:
+            item_text = f"[{pending_cnt}/{processing_cnt}] {group_name} ({max_res_time}m/{max_solve_time}m)"
+
+        return item_text, fg_color, bg_color
+
     def update_group_listbox_styles(self):
         tracked_groups = GroupDAO.get_tracked_groups()
         for idx, group in enumerate(tracked_groups):
             gid = group["id"]
             sla = GroupDAO.get_sla_settings(gid)
             pending_cnt, processing_cnt = TicketDAO.get_group_ticket_counts(gid)
-            has_overdue = TicketDAO.has_overdue_pending_tickets(gid)
-
-            if has_overdue:
-                item_text = f"⚠️ [{pending_cnt}/{processing_cnt}] {group['name']} ({sla['max_response_time']}m/{sla['max_resolve_time']}m)"
-            else:
-                item_text = f"[{pending_cnt}/{processing_cnt}] {group['name']} ({sla['max_response_time']}m/{sla['max_resolve_time']}m)"
+            item_text, fg_color, bg_color = self.get_group_item_format(
+                gid, group["name"], pending_cnt, processing_cnt, sla["max_response_time"], sla["max_resolve_time"]
+            )
 
             if idx < self.group_listbox.size():
                 current_text = self.group_listbox.get(idx)
@@ -1065,10 +1082,7 @@ class MainWindow(tk.Tk):
                     if is_selected:
                         self.group_listbox.selection_set(idx)
 
-                if has_overdue:
-                    self.group_listbox.itemconfigure(idx, fg="#C0392B", bg="#FDEDEC", selectforeground="#C0392B")
-                else:
-                    self.group_listbox.itemconfigure(idx, fg="#2C3E50", bg="white", selectforeground="#FFFFFF")
+                self.group_listbox.itemconfigure(idx, fg=fg_color, bg=bg_color, selectforeground=fg_color)
 
     def update_sla_loop(self):
         """

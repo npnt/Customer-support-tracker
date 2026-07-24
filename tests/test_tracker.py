@@ -726,5 +726,28 @@ class TestZaloCsTracker(unittest.TestCase):
         self.assertEqual(len(captured_messages), 1)
         self.assertEqual(captured_messages[0]["sender_name"], "Thuỷ Tiên")
 
+    def test_group_sla_overdue_status_3_colors(self):
+        gid = "g_sla_3colors"
+        GroupDAO.add_group(gid, "Group SLA 3 Colors", 1)
+
+        now_ms = int(time.time() * 1000)
+        # Ban đầu chưa có ticket -> (False, False)
+        resp_overdue, solve_overdue = TicketDAO.get_group_sla_overdue_status(gid)
+        self.assertFalse(resp_overdue)
+        self.assertFalse(solve_overdue)
+
+        # 1. Thêm Ticket PENDING quá hạn Response SLA (response_deadline đã qua) nhưng chưa qua resolve_deadline
+        TicketDAO.create_ticket(gid, "m_sla_1", "Khách A", "Lỗi 1", now_ms - 20000, now_ms - 10000, now_ms + 60000)
+        resp_overdue, solve_overdue = TicketDAO.get_group_sla_overdue_status(gid)
+        self.assertTrue(resp_overdue)
+        self.assertFalse(solve_overdue)
+
+        # 2. Thêm Ticket PROCESSING quá hạn Resolve SLA (resolve_deadline đã qua)
+        tid2 = TicketDAO.create_ticket(gid, "m_sla_2", "Khách B", "Lỗi 2", now_ms - 120000, now_ms - 60000, now_ms - 10000)
+        TicketDAO.update_ticket_status(tid2, "PROCESSING")
+        resp_overdue, solve_overdue = TicketDAO.get_group_sla_overdue_status(gid)
+        self.assertTrue(resp_overdue)
+        self.assertTrue(solve_overdue)
+
 if __name__ == "__main__":
     unittest.main()

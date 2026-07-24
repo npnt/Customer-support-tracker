@@ -59,7 +59,10 @@ Hệ thống **Zalo Customer Support Tracker** là ứng dụng Desktop hỗ tr�
 ### FR-05: Thiết Lập & Đếm Ngược SLA (Service Level Agreement)
 - **FR-05.1**: Cung cấp cửa sổ thiết lập thời gian SLA Tiếp nhận (`max_response_time`) và SLA Xử lý (`max_resolve_time`) cho từng nhóm Zalo (mặc định 15 phút / 60 phút).
 - **FR-05.2**: Hiển thị thông số SLA ngay sau tên nhóm ở Cột 1: `[Pending/Processing] Tên Nhóm (ResponseM/ResolveM)`.
-- **FR-05.3**: Cảnh báo trễ SLA tiếp nhận ở Cột 1: Nhóm có ticket trễ tiếp nhận được tô màu chữ đỏ `#C0392B`, nền hồng `#FDEDEC` và biểu tượng `⚠️`.
+- **FR-05.3**: Cảnh báo vi phạm SLA theo 3 thù hình màu sắc trực quan tại danh sách Nhóm Cột 1 (`group_listbox`):
+  - **Quá hạn SLA Tiếp nhận ONLY**: Biểu tượng `⚠️`, chữ màu **Cam đậm (`#D35400`)**, nền **Cam nhạt (`#FDEBD0`)**.
+  - **Quá hạn SLA Xử lý ONLY**: Biểu tượng `🛠️`, chữ màu **Tím đậm (`#8E44AD`)**, nền **Tím nhạt (`#F4ECF7`)**.
+  - **Quá hạn CẢ HAI SLA (Tiếp nhận & Xử lý)**: Biểu tượng `🚨`, chữ màu **Đỏ đậm (`#C0392B`)**, nền **Hồng nhạt (`#FDEDEC`)**.
 - **FR-05.4**: Hiển thị thời gian SLA xử lý còn lại đếm ngược tự động tại Khung Header Cột 3 với quy tắc đổi màu:
   - 🔴 **Màu Đỏ (`#C0392B`)**: Khi quá hạn SLA (`< 0` phút).
   - 🟡 **Màu Vàng/Cam (`#D35400`)**: Khi còn dưới 10% SLA thời gian xử lý.
