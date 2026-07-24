@@ -262,32 +262,38 @@ class MainWindow(tk.Tk):
         self.ticket_sla_label = tk.Label(header_frame, text="", font=("Arial", 9, "bold"), justify="left", anchor="w", wraplength=320)
         self.ticket_sla_label.pack(fill="x", anchor="w", pady=(2, 0))
         
+        # Nút Hành động ở dưới cùng Cột 3 (Pack side="bottom" trước response_tree để không bị đè/mất nút)
+        btn_frame = ttk.Frame(right_frame)
+        btn_frame.pack(fill="x", side="bottom", pady=(5, 0))
+
+        btn_row1 = ttk.Frame(btn_frame)
+        btn_row1.pack(fill="x", pady=(0, 3))
+
+        btn_row2 = ttk.Frame(btn_frame)
+        btn_row2.pack(fill="x")
+
+        self.resolve_btn = ttk.Button(btn_row1, text="✅ Đóng Yêu Cầu", command=self.on_resolve_clicked, state="disabled")
+        self.resolve_btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
+
+        self.reopen_btn = ttk.Button(btn_row1, text="🔓 Mở Lại Yêu Cầu", command=self.on_reopen_clicked, state="disabled")
+        self.reopen_btn.pack(side="left", fill="x", expand=True)
+
+        self.split_ticket_btn = ttk.Button(btn_row2, text="✂️ Tách Ticket", command=self.on_split_ticket_clicked, state="disabled")
+        self.split_ticket_btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
+
+        self.merge_ticket_btn = ttk.Button(btn_row2, text="🔗 Gán Vào Ticket Khác", command=self.on_merge_ticket_clicked, state="disabled")
+        self.merge_ticket_btn.pack(side="left", fill="x", expand=True)
+
         # Cây phản hồi sử dụng ttk.Treeview với chiều cao dòng thoáng hơn (rowheight=32)
         style.configure("ResponseTree.Treeview", rowheight=32, font=("Arial", 10))
         self.response_tree = ttk.Treeview(right_frame, show="tree", style="ResponseTree.Treeview")
-        self.response_tree.pack(fill="both", expand=True, pady=(0, 10))
+        self.response_tree.pack(fill="both", expand=True, pady=(0, 5))
         self.response_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
-        
+
         # Cấu hình màu nền và chữ cho các trạng thái trên cây
         self.response_tree.tag_configure("needs_review", background="#FFF3CD")
         self.response_tree.tag_configure("RESOLVED", foreground="#7F8C8D")
         self.response_tree.tag_configure("PROCESSING", foreground="#2C3E50", font=("Arial", 10, "bold"))
-
-        # Nút Hành động
-        btn_frame = ttk.Frame(right_frame)
-        btn_frame.pack(fill="x", side="bottom")
-        
-        self.resolve_btn = ttk.Button(btn_frame, text="✅ Đóng Yêu Cầu", command=self.on_resolve_clicked, state="disabled")
-        self.resolve_btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
-
-        self.reopen_btn = ttk.Button(btn_frame, text="🔓 Mở Lại Yêu Cầu", command=self.on_reopen_clicked, state="disabled")
-        self.reopen_btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
-        
-        self.split_ticket_btn = ttk.Button(btn_frame, text="✂️ Tách Ticket", command=self.on_split_ticket_clicked, state="disabled")
-        self.split_ticket_btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
-
-        self.merge_ticket_btn = ttk.Button(btn_frame, text="🔗 Gán Vào Ticket Khác", command=self.on_merge_ticket_clicked, state="disabled")
-        self.merge_ticket_btn.pack(side="left", fill="x", expand=True)
         
         main_pane.add(right_frame, weight=2)
 
@@ -543,6 +549,20 @@ class MainWindow(tk.Tk):
                     text=child_text, 
                     tags=child_tags
                 )
+
+        if self.selected_ticket_id and self.response_tree.exists(f"ticket_{self.selected_ticket_id}"):
+            self.response_tree.selection_set(f"ticket_{self.selected_ticket_id}")
+            self.response_tree.see(f"ticket_{self.selected_ticket_id}")
+            ticket = TicketDAO.get_ticket_by_id(self.selected_ticket_id)
+            if ticket:
+                self.update_ticket_header_info(ticket)
+                if ticket["status"] == "RESOLVED":
+                    self.resolve_btn.configure(state="disabled")
+                    self.reopen_btn.configure(state="normal")
+                else:
+                    self.resolve_btn.configure(state="normal")
+                    self.reopen_btn.configure(state="disabled")
+            self.check_merge_button_state()
 
     def on_group_selected(self, event):
         selection = self.group_listbox.curselection()
