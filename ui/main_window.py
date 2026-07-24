@@ -214,6 +214,7 @@ class MainWindow(tk.Tk):
         self.group_listbox = tk.Listbox(left_frame, font=("Arial", 10), height=15, exportselection=False)
         self.group_listbox.pack(fill="both", expand=True, pady=(0, 10))
         self.group_listbox.bind("<<ListboxSelect>>", self.on_group_selected)
+        self.group_listbox.bind("<Button-3>", self.show_group_context_menu)
         
         group_btn_frame = ttk.Frame(left_frame)
         group_btn_frame.pack(fill="x", pady=(0, 15))
@@ -556,6 +557,34 @@ class MainWindow(tk.Tk):
                     self.resolve_btn.configure(state="normal")
                     self.reopen_btn.configure(state="disabled")
             self.check_merge_button_state()
+
+    def show_group_context_menu(self, event):
+        idx = self.group_listbox.nearest(event.y)
+        if idx >= 0:
+            self.group_listbox.selection_clear(0, tk.END)
+            self.group_listbox.selection_set(idx)
+            self.on_group_selected(None)
+
+            menu = tk.Menu(self, tearoff=0)
+            menu.add_command(label="⚙️ Thiết lập SLA nhóm này", command=self.on_sla_clicked)
+            menu.add_command(label="👥 Quản lý Nhân viên nhóm này", command=self.on_manage_staff_clicked)
+            menu.add_separator()
+            menu.add_command(label="❌ Bỏ theo dõi nhóm này", command=self.on_untrack_group_clicked)
+            menu.tk_popup(event.x_root, event.y_root)
+
+    def on_untrack_group_clicked(self):
+        if not self.selected_group_id:
+            return
+        tracked_groups = GroupDAO.get_tracked_groups()
+        selected_group = next((g for g in tracked_groups if str(g["id"]) == str(self.selected_group_id)), None)
+        if not selected_group:
+            return
+
+        if messagebox.askyesno("Xác nhận Bỏ Theo Dõi", f"Bạn có chắc muốn bỏ theo dõi nhóm '{selected_group['name']}' khỏi Cột 1?"):
+            GroupDAO.set_tracking(self.selected_group_id, 0)
+            self.selected_group_id = None
+            self.refresh_ui()
+            self.show_status_message(f"Đã bỏ theo dõi nhóm '{selected_group['name']}'.")
 
     def on_group_selected(self, event):
         selection = self.group_listbox.curselection()
