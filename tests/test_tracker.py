@@ -13,7 +13,7 @@ config.DB_PATH = "test_zalo_cs_tracker.db"
 
 import database
 from database import GroupDAO, MessageDAO, TicketDAO, initialize_database
-from app_core import TicketManager
+from app_core import TicketManager, AppCore
 
 class TestZaloCsTracker(unittest.TestCase):
     def setUp(self):
@@ -589,6 +589,35 @@ class TestZaloCsTracker(unittest.TestCase):
         t_after_staff = TicketDAO.get_ticket_by_id(tid)
         self.assertEqual(t_after_staff["status"], "PROCESSING")
         self.assertIsNotNone(t_after_staff["acknowledged_at"])
+
+    def test_image_message_filtering_and_ticket_creation(self):
+        # 1. Kiểm thử lọc tin nhắn hình ảnh / media trong AppCore
+        self.assertFalse(AppCore.is_ai_eligible_message("[Hình ảnh đính kèm: http://zalo.me/photo.jpg]"))
+        self.assertFalse(AppCore.is_ai_eligible_message("Hình ảnh"))
+        self.assertFalse(AppCore.is_ai_eligible_message("Đã gửi một hình ảnh"))
+        self.assertFalse(AppCore.is_ai_eligible_message("[Tập tin đính kèm: error_log.txt]"))
+        self.assertTrue(AppCore.is_ai_eligible_message("Hệ thống báo lỗi 500 không đăng nhập được"))
+
+        # 2. Giả lập kịch bản: Khách gửi Tin nhắn 1 (Ảnh) rồi Tin nhắn 2 (Message chữ)
+        gid = "g_img_test"
+        GroupDAO.add_group(gid, "Group Image Test", 1)
+        now_ms = int(time.time() * 1000)
+
+        img_msg = {"msg_id": "msg_img_1", "group_id": gid, "sender_id": "c_img", "sender_name": "Khách Báo Lỗi", "content": "[Hình ảnh đính kèm: http://photo.png]", "timestamp": now_ms}
+        text_msg = {"msg_id": "msg_text_2", "group_id": gid, "sender_id": "c_img", "sender_name": "Khách Báo Lỗi", "content": "Phần mềm bị treo khi bấm lưu hóa đơn", "timestamp": now_ms + 1000}
+
+        # Tin nhắn 1 (Hình ảnh) ➔ is_ai_eligible_message trả về False ➔ Gán "OTHER"
+        self.assertFalse(AppCore.is_ai_eligible_message(img_msg["content"]))
+
+        # Tin nhắn 2 (Message chữ) ➔ is_ai_eligible_message trả về True ➔ Tạo Ticket REQUEST mới thành công
+        self.assertTrue(AppCore.is_ai_eligible_message(text_msg["content"]))
+        tid = self.tm.process_request(text_msg, 0.95, 0)
+        self.assertIsNotNone(tid)
+
+        t_created = TicketDAO.get_ticket_by_id(tid)
+        self.assertEqual(t_created["requester_name"], "Khách Báo Lỗi")
+        self.assertEqual(t_created["request_content"], "Phần mềm bị treo khi bấm lưu hóa đơn")
+        self.assertEqual(t_created["status"], "PENDING")
 
 if __name__ == "__main__":
     unittest.main()

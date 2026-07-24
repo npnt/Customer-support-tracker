@@ -299,7 +299,7 @@ class AppCore:
     def is_ai_eligible_message(content, metadata=None):
         """
         Kiểm tra xem tin nhắn có phải là tin nhắn văn bản thực sự để gửi AI phân loại hay không.
-        Bỏ qua các tin nhắn dạng emotion, reaction, sticker, like, heart, marker, dict, link...
+        Bỏ qua các tin nhắn dạng hình ảnh, photo, file, đính kèm, emotion, reaction, sticker, like, heart, link...
         """
         if not content:
             return False
@@ -314,23 +314,34 @@ class AppCore:
         if not text:
             return False
 
+        text_lower = text.lower()
+
         # 1. Bỏ qua các định dạng tin nhắn hệ thống / media / emotion bọc trong ngoặc vuông [] hoặc {}
         if (text.startswith("[") and text.endswith("]")) or (text.startswith("{") and text.endswith("}")):
             return False
 
-        # 2. Bỏ qua nếu metadata xác định thuộc loại sticker/emotion/reaction/like/heart/photo/file/link
+        # 2. Bỏ qua nếu chuỗi bắt đầu bằng các chỉ báo hình ảnh / file / media
+        MEDIA_INDICATOR_PREFIXES = (
+            "[hình ảnh", "[tập tin", "[file", "[photo", "[nhãn dán", "[tin nhắn đa phương tiện", "[media"
+        )
+        if any(text_lower.startswith(prefix) for prefix in MEDIA_INDICATOR_PREFIXES):
+            return False
+
+        # 3. Bỏ qua nếu nội dung trùng với từ khóa hình ảnh / media / emotion
+        MEDIA_EXACT_KEYWORDS = {
+            "👍", "❤️", "😍", "😊", "😂", "😭", "🙏", "👌", "🔥", "🎉", "👏", "🥰", "😮", "😢", "😠",
+            "like", "heart", "reaction", "emotion", "sticker", "thả cảm xúc", "cảm xúc",
+            "hình ảnh", "ảnh", "photo", "file", "tập tin", "đã gửi một hình ảnh", "đã gửi 1 hình ảnh",
+            "đã gửi ảnh", "ảnh đính kèm", "tập tin đính kèm"
+        }
+        if text_lower in MEDIA_EXACT_KEYWORDS:
+            return False
+
+        # 4. Bỏ qua nếu metadata xác định thuộc loại sticker/emotion/reaction/like/heart/photo/file/link
         if metadata and isinstance(metadata, dict):
             msg_type = str(metadata.get("type", "")).lower()
-            if msg_type in ("sticker", "reaction", "emotion", "like", "heart", "event", "undo", "photo", "file", "link"):
+            if msg_type in ("sticker", "reaction", "emotion", "like", "heart", "event", "undo", "photo", "file", "link", "media"):
                 return False
-
-        # 3. Bỏ qua các biểu tượng emotion / emoji / reaction đơn lẻ
-        EMOTION_KEYWORDS = {
-            "👍", "❤️", "😍", "😊", "😂", "😭", "🙏", "👌", "🔥", "🎉", "👏", "🥰", "😮", "😢", "😠",
-            "like", "heart", "reaction", "emotion", "sticker", "thả cảm xúc", "cảm xúc"
-        }
-        if text.lower() in EMOTION_KEYWORDS:
-            return False
 
         return True
 

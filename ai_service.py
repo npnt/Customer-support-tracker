@@ -109,9 +109,10 @@ Dưới đây là danh sách các Ticket đang mở và danh sách tin nhắn m�
    - "REQUEST": Tin nhắn yêu cầu hỗ trợ mới từ khách hàng (hỏi giá, báo lỗi, hỏi đáp kỹ thuật...).
    - "RESPONSE": Tin nhắn phản hồi thông tin hoặc hỗ trợ xử lý của kỹ thuật viên/admin, hoặc tin nhắn làm rõ thêm của khách hàng cho ticket cũ.
    - "RESOLVE": Tin nhắn báo đã xử lý xong, thông báo khắc phục xong lỗi, hoặc tin nhắn cảm ơn/xác nhận đã hoàn thành từ khách hàng (ví dụ: "cảm ơn", "xử lý xong rồi", "đã ok", "đã sửa xong", "dạ cảm ơn anh", "ok rồi nhé"...).
-   - "OTHER": Tin chào hỏi, xã giao, tin nhắn rác không thuộc diện cần xử lý.
-2. Đối với tin "RESPONSE" hoặc "RESOLVE", hãy tìm kiếm xem nó liên quan/phản hồi tới Ticket nào trong "DANH SÁCH TICKET ĐANG MỞ". Trả về ID của Ticket đó vào trường `target_ticket_id`. Nếu không liên quan hoặc không tìm thấy, đặt là null.
-3. Cung cấp chỉ số độ tin cậy `confidence` (từ 0.0 đến 1.0) cho phân loại này.
+   - "OTHER": Tin chào hỏi, xã giao, tin nhắn rác không thuộc diện cần xử lý, hoặc các tin nhắn chỉ là chỉ báo hình ảnh/tập tin đính kèm (ví dụ: "[Hình ảnh đính kèm...]", "[Tập tin...]", "Hình ảnh").
+2. QUY TẮC BẮT BUỘC: Tất cả các tin nhắn chỉ là chỉ báo hình ảnh, photo, media hoặc file đính kèm BẮT BUỘC phải phân loại là "OTHER" (target_ticket_id = null), TUYỆT ĐỐI không phân loại là "REQUEST", "RESPONSE" hay "RESOLVE".
+3. Đối với tin "RESPONSE" hoặc "RESOLVE", hãy tìm kiếm xem nó liên quan/phản hồi tới Ticket nào trong "DANH SÁCH TICKET ĐANG MỞ". Trả về ID của Ticket đó vào trường `target_ticket_id`. Nếu không liên quan hoặc không tìm thấy, đặt là null.
+4. Cung cấp chỉ số độ tin cậy `confidence` (từ 0.0 đến 1.0) cho phân loại này.
 
 ### ĐỊNH DẠNG TRẢ VỀ (JSON Array duy nhất, không có markdown block):
 [
