@@ -145,21 +145,23 @@ class TicketManager:
             requester_clean = str(ticket["requester_name"]).strip().lower() if ticket else ""
             responder_clean = str(sender_name).strip().lower()
 
-            # Chỉ lưu vào lịch sử phản hồi KTV và tiếp nhận Ticket nếu người gửi LÀ Nhân viên Hỗ trợ đã đăng ký
-            if responder_clean != requester_clean and is_support_staff:
-                TicketDAO.add_response(
-                    ticket_id=chosen_ticket_id,
-                    response_msg_id=msg_id,
-                    responder_name=sender_name,
-                    response_content=content,
-                    created_at=timestamp
-                )
+            # 1. Luôn lưu tin nhắn phản hồi vào lịch sử responses để hiển thị đầy đủ luồng trao đổi ở Cột 3
+            TicketDAO.add_response(
+                ticket_id=chosen_ticket_id,
+                response_msg_id=msg_id,
+                responder_name=sender_name,
+                response_content=content,
+                created_at=timestamp
+            )
 
+            # 2. Chỉ chuyển trạng thái PENDING -> PROCESSING (Tiếp nhận) nếu người gửi LÀ Nhân viên Hỗ trợ được phân công
+            if responder_clean != requester_clean and is_support_staff:
                 if ticket and ticket["status"] == "PENDING":
                     TicketDAO.update_ticket_status(chosen_ticket_id, "PROCESSING", acknowledged_at=timestamp)
                     logger.info(f"Ticket #{chosen_ticket_id} đã được tiếp nhận bởi KTV/Admin {sender_name}. Chuyển sang PROCESSING.")
             else:
-                logger.info(f"Ticket #{chosen_ticket_id}: Nhận thêm thông tin từ {sender_name} (không phải Nhân viên Hỗ trợ). Giữ nguyên trạng thái PENDING.")
+                curr_status = ticket["status"] if ticket else "PENDING"
+                logger.info(f"Ticket #{chosen_ticket_id}: Nhận thêm thông tin từ {sender_name}. Giữ nguyên trạng thái {curr_status}.")
 
             MessageDAO.update_classification(msg_id, "RESPONSE", confidence, final_needs_review, chosen_ticket_id)
             
