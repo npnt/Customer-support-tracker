@@ -47,8 +47,9 @@ zalo_session.json
 logs/
 backups/
 
-# Test databases
+# Test databases và test data
 test_zalo_cs_tracker.db
 test_zalo_cs_tracker.db-journal
 test_zalo_cs_tracker.db-wal
 test_zalo_cs_tracker.db-shm
+tests/test_data/
