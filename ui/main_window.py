@@ -284,7 +284,10 @@ class MainWindow(tk.Tk):
         self.reopen_btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
         
         self.split_ticket_btn = ttk.Button(btn_frame, text="✂️ Tách Ticket", command=self.on_split_ticket_clicked, state="disabled")
-        self.split_ticket_btn.pack(side="left", fill="x", expand=True)
+        self.split_ticket_btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
+
+        self.merge_ticket_btn = ttk.Button(btn_frame, text="🔗 Gán Vào Ticket Khác", command=self.on_merge_ticket_clicked, state="disabled")
+        self.merge_ticket_btn.pack(side="left", fill="x", expand=True)
         
         main_pane.add(right_frame, weight=2)
 
@@ -651,6 +654,7 @@ class MainWindow(tk.Tk):
             self.resolve_btn.configure(state="normal")
             self.reopen_btn.configure(state="disabled")
         self.split_ticket_btn.configure(state="disabled")
+        self.check_merge_button_state()
 
     def on_tree_select(self, event):
         selected_items = self.response_tree.selection()
@@ -659,6 +663,7 @@ class MainWindow(tk.Tk):
             self.resolve_btn.configure(state="disabled")
             self.reopen_btn.configure(state="disabled")
             self.split_ticket_btn.configure(state="disabled")
+            self.merge_ticket_btn.configure(state="disabled")
             self.update_ticket_header_info(None)
             return
             
@@ -694,6 +699,21 @@ class MainWindow(tk.Tk):
             self.split_ticket_btn.configure(state="normal")
         else:
             self.split_ticket_btn.configure(state="disabled")
+
+        self.check_merge_button_state()
+
+    def check_merge_button_state(self):
+        if self.selected_ticket_id:
+            ticket = TicketDAO.get_ticket_by_id(self.selected_ticket_id)
+            if ticket:
+                group_id = ticket["group_id"]
+                unresolved = TicketDAO.get_unresolved_tickets(group_id)
+                supported = TicketDAO.get_supported_tickets(group_id)
+                candidates = [t for t in unresolved + supported if t["id"] != ticket["id"]]
+                if candidates:
+                    self.merge_ticket_btn.configure(state="normal")
+                    return
+        self.merge_ticket_btn.configure(state="disabled")
 
     def on_resolve_clicked(self):
         if not self.selected_ticket_id:
@@ -741,6 +761,42 @@ class MainWindow(tk.Tk):
                 self.refresh_ui()
                 self.show_status_message(f"Đã tách thành công {len(response_ids)} tin nhắn thành Ticket mới #{new_ticket_id}.")
                 messagebox.showinfo("Thành công", f"Đã tách {len(response_ids)} tin nhắn thành Ticket mới #{new_ticket_id}!")
+
+    def on_merge_ticket_clicked(self):
+        if not self.selected_ticket_id:
+            messagebox.showwarning("Cảnh báo", "Vui lòng chọn một Ticket cần gán/gộp.")
+            return
+
+        source_ticket = TicketDAO.get_ticket_by_id(self.selected_ticket_id)
+        if not source_ticket:
+            return
+
+        group_id = source_ticket["group_id"]
+        unresolved = TicketDAO.get_unresolved_tickets(group_id)
+        supported = TicketDAO.get_supported_tickets(group_id)
+
+        all_candidates_dict = {}
+        for t in unresolved + supported:
+            if t["id"] != source_ticket["id"]:
+                all_candidates_dict[t["id"]] = t
+
+        candidate_tickets = list(all_candidates_dict.values())
+        if not candidate_tickets:
+            messagebox.showwarning("Cảnh báo", f"Nhóm Zalo này hiện không có Ticket nào khác để gán/gộp Ticket #{source_ticket['id']} vào.")
+            return
+
+        from ui.dialogs import MergeTicketDialog
+        dialog = MergeTicketDialog(source_ticket, candidate_tickets, self)
+        self.wait_window(dialog)
+
+        target_ticket_id = dialog.get_selected_target_id()
+        if target_ticket_id:
+            success = self.core.ticket_manager.merge_ticket(source_ticket["id"], target_ticket_id)
+            if success:
+                self.selected_ticket_id = target_ticket_id
+                self.refresh_ui()
+                self.show_status_message(f"Đã gộp thành công Ticket #{source_ticket['id']} vào Ticket #{target_ticket_id}.")
+                messagebox.showinfo("Thành công", f"Đã gộp Ticket #{source_ticket['id']} vào Ticket #{target_ticket_id} thành công!")
 
     def on_add_group_clicked(self):
         self.show_status_message("Đang tải danh sách nhóm từ Zalo...")

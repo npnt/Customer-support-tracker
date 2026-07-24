@@ -49,14 +49,14 @@ Hệ thống **Zalo Customer Support Tracker** được thiết kế theo mô h�
   - Giao diện chính phân 3 cột (PanedWindow):
     - **Cột 1 (Bên trái)**: Trạng thái kết nối, nút đăng nhập QR, nút `⚙️ Thiết lập SLA`, nút `👥 QL Nhân Viên` và danh sách các nhóm Zalo đang theo dõi (`group_listbox`).
     - **Cột 2 (Ở giữa)**: Thẻ Ticket đang chờ hỗ trợ (`ticket_cards`) và Bảng tin nhắn thời gian thực (`live_tree`).
-    - **Cột 3 (Bên phải)**: Header chi tiết thông tin Ticket kèm thời gian SLA xử lý đếm ngược (tô màu Đỏ/Vàng/Xanh), Cây phản hồi trao đổi 2 chiều (`response_tree` có `rowheight=32`), và bộ nút hành động (`✅ Đóng Yêu Cầu`, `🔓 Mở Lại Yêu Cầu`, `✂️ Tách Ticket`).
+    - **Cột 3 (Bên phải)**: Header chi tiết thông tin Ticket kèm thời gian SLA xử lý đếm ngược (tô màu Đỏ/Vàng/Xanh), Cây phản hồi trao đổi 2 chiều (`response_tree` có `rowheight=32`), và bộ nút hành động (`✅ Đóng Yêu Cầu`, `🔓 Mở Lại Yêu Cầu`, `✂️ Tách Ticket`, `🔗 Gán Vào Ticket Khác`).
 - **`ui/dashboard.py` (`DashboardWindow`)**:
   - Cửa sổ báo cáo & thống kê SLA với 2 Tab:
     - **Tab Nhóm Zalo**: Thẻ KPI động + Bảng dữ liệu + Biểu đồ Canvas so sánh SLA nhóm.
     - **Tab Nhân Viên Hỗ Trợ**: Dropdown lọc theo từng nhóm Zalo + Bảng năng suất nhân viên (chỉ lọc nhân viên được phân công) + Cột Ticket Quá Hạn Xử Lý + Biểu đồ cột Canvas.
 - **`ui/dialogs.py`**:
-  - Định nghĩa các cửa sổ Modal popup: `LoginDialog`, `SlaSettingsDialog`, `GroupSelectDialog`, `StaffManagementDialog`.
-  - Tích hợp Combobox chọn nhóm trực tiếp trong `StaffManagementDialog`.
+  - Định nghĩa các cửa sổ Modal popup: `LoginDialog`, `SlaSettingsDialog`, `GroupSelectDialog`, `StaffManagementDialog`, `MergeTicketDialog`.
+  - Tích hợp Combobox chọn nhóm trực tiếp trong `StaffManagementDialog` và bảng chọn Ticket mục tiêu trong `MergeTicketDialog`.
   - Chứa hàm utility `center_window_over_parent(dlg, parent)` tự động căn giữa popup (bảo toàn kích thước `dw x dh + cx + cy`) trên đúng màn hình phụ đối với máy tính đa màn hình.
 
 ### 2.2 Tầng Nghiệp Vụ & AI (Business Core Layer)
@@ -66,6 +66,7 @@ Hệ thống **Zalo Customer Support Tracker** được thiết kế theo mô h�
   - Tự động tạo Ticket khi nhận tin nhắn `REQUEST`.
   - Lưu trữ đầy đủ tin nhắn phản hồi 2 chiều của cả Khách hàng và KTV vào bảng `responses`. Chỉ chuyển Ticket `PENDING` ➔ `PROCESSING` khi người phản hồi là **Nhân viên Hỗ trợ được phân công**.
   - Thực hiện tách Ticket (`split_ticket`): Chuyển phản hồi được chọn thành Ticket mới và liên kết thông minh các phản hồi liên quan.
+  - Thực hiện gán/gộp Ticket (`merge_ticket`): Chuyển tin nhắn yêu cầu gốc của Ticket nguồn thành phản hồi của Ticket đích, di chuyển lịch sử phản hồi và dọn dẹp CSDL.
   - Xử lý tin nhắn `RESOLVE` của khách hàng và tự động đóng Ticket (`auto_resolved = 1`).
 - **`ai_service.py` (`AIService`)**:
   - Phân loại ý định tin nhắn (`REQUEST`, `RESPONSE`, `RESOLVE`, `OTHER`).

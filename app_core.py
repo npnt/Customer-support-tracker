@@ -347,6 +347,60 @@ class TicketManager:
 
         return new_ticket_id
 
+    def merge_ticket(self, source_ticket_id, target_ticket_id):
+        """
+        Gán/Gộp source_ticket_id (Ticket bị nhận nhầm) vào target_ticket_id.
+        - Tin nhắn yêu cầu gốc của source_ticket chuyển thành RESPONSE liên kết vào target_ticket.
+        - Chuyển toàn bộ các phản hồi con (nếu có) từ source_ticket sang target_ticket.
+        - Xóa bản ghi source_ticket khỏi CSDL.
+        """
+        if not source_ticket_id or not target_ticket_id or source_ticket_id == target_ticket_id:
+            return False
+
+        source_ticket = TicketDAO.get_ticket_by_id(source_ticket_id)
+        target_ticket = TicketDAO.get_ticket_by_id(target_ticket_id)
+
+        if not source_ticket or not target_ticket:
+            return False
+
+        # 1. Chuyển tin nhắn yêu cầu gốc của source_ticket thành phản hồi cho target_ticket
+        TicketDAO.add_response(
+            ticket_id=target_ticket_id,
+            response_msg_id=source_ticket["request_msg_id"],
+            responder_name=source_ticket["requester_name"],
+            response_content=source_ticket["request_content"],
+            created_at=source_ticket["created_at"]
+        )
+        MessageDAO.update_classification(source_ticket["request_msg_id"], "RESPONSE", 1.0, 0, target_ticket_id)
+
+        # 2. Chuyển toàn bộ các tin nhắn phản hồi con của source_ticket sang target_ticket
+        TicketDAO.relink_responses(source_ticket_id, target_ticket_id)
+
+        # 3. Xóa bản ghi source_ticket khỏi CSDL
+        TicketDAO.delete_ticket(source_ticket_id)
+        logger.info(f"Đã gộp Ticket #{source_ticket_id} vào Ticket #{target_ticket_id} thành công.")
+
+        # 4. Kiểm tra lại trạng thái tiếp nhận của target_ticket
+        target_responses = TicketDAO.get_ticket_responses(target_ticket_id)
+        group_id = target_ticket["group_id"]
+        requester_clean = target_ticket["requester_name"].strip().lower()
+
+        has_staff_response = False
+        earliest_staff_ack = None
+
+        for r in target_responses:
+            responder_clean = r["responder_name"].strip().lower()
+            if GroupDAO.is_support_staff(group_id, r["responder_name"]) and responder_clean != requester_clean:
+                has_staff_response = True
+                if earliest_staff_ack is None or r["created_at"] < earliest_staff_ack:
+                    earliest_staff_ack = r["created_at"]
+
+        if has_staff_response and target_ticket["status"] == "PENDING" and earliest_staff_ack:
+            TicketDAO.update_ticket_status(target_ticket_id, "PROCESSING", acknowledged_at=earliest_staff_ack)
+            logger.info(f"Ticket #{target_ticket_id} tự động chuyển sang PROCESSING sau khi gộp.")
+
+        return True
+
     @staticmethod
     def get_remaining_sla(ticket):
         now_ms = int(time.time() * 1000)

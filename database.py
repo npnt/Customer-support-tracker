@@ -442,6 +442,20 @@ class TicketDAO:
             conn.commit()
 
     @staticmethod
+    def delete_ticket(ticket_id):
+        with get_connection() as conn:
+            conn.execute("DELETE FROM tickets WHERE id = ?", (ticket_id,))
+            conn.execute("DELETE FROM responses WHERE ticket_id = ?", (ticket_id,))
+            conn.commit()
+
+    @staticmethod
+    def relink_responses(source_ticket_id, target_ticket_id):
+        with get_connection() as conn:
+            conn.execute("UPDATE responses SET ticket_id = ? WHERE ticket_id = ?", (target_ticket_id, source_ticket_id))
+            conn.execute("UPDATE messages SET ticket_id = ? WHERE ticket_id = ?", (target_ticket_id, source_ticket_id))
+            conn.commit()
+
+    @staticmethod
     def get_supported_tickets(group_id):
         with get_connection() as conn:
             cursor = conn.execute(

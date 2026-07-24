@@ -573,3 +573,87 @@ class StaffManagementDialog(tk.Toplevel):
 
     def get_data(self):
         return self.result
+
+
+class MergeTicketDialog(tk.Toplevel):
+    def __init__(self, source_ticket, candidate_tickets, parent=None):
+        super().__init__(parent)
+        self.title(f"🔗 Gán / Gộp Ticket #{source_ticket['id']} Vào Ticket Khác")
+        self.geometry("560x430")
+        self.resizable(True, True)
+
+        self.source_ticket = source_ticket
+        self.candidate_tickets = candidate_tickets
+        self.selected_target_id = None
+
+        self.transient(parent)
+        self.grab_set()
+
+        self.init_ui()
+        center_window_over_parent(self, parent)
+
+    def init_ui(self):
+        main_frame = ttk.Frame(self, padding="15")
+        main_frame.pack(fill="both", expand=True)
+
+        # Header info
+        content_snippet = str(self.source_ticket['request_content'])[:65].replace("\n", " ")
+        header_text = f"Đang chọn gộp Ticket #{self.source_ticket['id']} của '{self.source_ticket['requester_name']}':\n\"{content_snippet}...\""
+        ttk.Label(main_frame, text=header_text, font=("Arial", 9, "bold"), foreground="#2C3E50", wraplength=520, justify="left").pack(anchor="w", pady=(0, 10))
+
+        ttk.Label(main_frame, text="Vui lòng chọn Ticket mục tiêu để gán/gộp vào:", font=("Arial", 9)).pack(anchor="w", pady=(0, 5))
+
+        # Treeview danh sách candidate tickets
+        tree_frame = ttk.Frame(main_frame)
+        tree_frame.pack(fill="both", expand=True, pady=(0, 10))
+
+        columns = ("id", "requester", "status", "content")
+        self.tree = ttk.Treeview(tree_frame, columns=columns, show="headings", selectmode="browse", height=8)
+
+        self.tree.heading("id", text="ID")
+        self.tree.heading("requester", text="Người Yêu Cầu")
+        self.tree.heading("status", text="Trạng Thái")
+        self.tree.heading("content", text="Nội Dung Yêu Cầu")
+
+        self.tree.column("id", width=50, anchor="center")
+        self.tree.column("requester", width=120, anchor="w")
+        self.tree.column("status", width=95, anchor="center")
+        self.tree.column("content", width=250, anchor="w")
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+
+        self.tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Nạp dữ liệu candidate_tickets
+        for t in self.candidate_tickets:
+            st_text = "PENDING 🟡" if t["status"] == "PENDING" else ("PROCESSING 🔵" if t["status"] == "PROCESSING" else "RESOLVED 🟢")
+            content_preview = str(t["request_content"]).replace("\n", " ")[:50]
+            self.tree.insert("", "end", iid=str(t["id"]), values=(f"#{t['id']}", t["requester_name"], st_text, content_preview))
+
+        # Bottom Buttons
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(fill="x")
+
+        ttk.Button(btn_frame, text="Hủy Bỏ", command=self.destroy).pack(side="right", padx=(5, 0))
+        self.confirm_btn = ttk.Button(btn_frame, text="🔗 Xác Nhận Gộp", command=self.on_confirm, state="disabled")
+        self.confirm_btn.pack(side="right")
+
+        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+
+    def on_tree_select(self, event):
+        sel = self.tree.selection()
+        if sel:
+            self.selected_target_id = int(sel[0])
+            self.confirm_btn.configure(state="normal")
+        else:
+            self.selected_target_id = None
+            self.confirm_btn.configure(state="disabled")
+
+    def on_confirm(self):
+        if self.selected_target_id:
+            self.destroy()
+
+    def get_selected_target_id(self):
+        return self.selected_target_id

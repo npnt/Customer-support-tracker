@@ -54,6 +54,7 @@ Hệ thống **Zalo Customer Support Tracker** là ứng dụng Desktop hỗ tr�
   - Người dùng bấm nút check `✅ Đóng Yêu Cầu` thủ công (đóng Ticket bởi người dùng với icon `✅`).
 - **FR-04.5**: Cho phép mở lại Ticket (`RESOLVED` ➔ `PENDING`/`PROCESSING`) thông qua nút `🔓 Mở Lại Yêu Cầu`.
 - **FR-04.6**: Cho phép tách 1 hoặc nhiều tin nhắn phản hồi thành Ticket mới (`✂️ Tách Ticket`). AI phân tích và liên kết thông minh các phản hồi liên quan, tự động xác định trạng thái `PENDING` hay `PROCESSING` cho Ticket mới.
+- **FR-04.7**: Cho phép gán/gộp một Ticket bị AI nhận nhầm thành Ticket mới vào một Ticket mục tiêu khác trong cùng nhóm (`🔗 Gán Vào Ticket Khác`). Tự động di chuyển lịch sử phản hồi, chuyển tin nhắn yêu cầu thành `RESPONSE` và dọn dẹp CSDL.
 
 ### FR-05: Thiết Lập & Đếm Ngược SLA (Service Level Agreement)
 - **FR-05.1**: Cung cấp cửa sổ thiết lập thời gian SLA Tiếp nhận (`max_response_time`) và SLA Xử lý (`max_resolve_time`) cho từng nhóm Zalo (mặc định 15 phút / 60 phút).

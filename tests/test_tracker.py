@@ -668,5 +668,36 @@ class TestZaloCsTracker(unittest.TestCase):
         old_responses = TicketDAO.get_ticket_responses(orig_tid)
         self.assertEqual(len(old_responses), 0)
 
+    def test_merge_ticket_functionality(self):
+        gid = "g_merge_test"
+        GroupDAO.add_group(gid, "Group Merge Test", 1)
+
+        now_ms = int(time.time() * 1000)
+        # Target Ticket (Ticket #1)
+        req_msg1 = {"msg_id": "m_m1", "group_id": gid, "sender_id": "c1", "sender_name": "Khách A", "content": "Hỏi giá máy in", "timestamp": now_ms}
+        MessageDAO.save_message(req_msg1["msg_id"], req_msg1["group_id"], req_msg1["sender_id"], req_msg1["sender_name"], req_msg1["content"], req_msg1["timestamp"])
+        target_tid = self.tm.process_request(req_msg1, 0.95, 0)
+
+        # Source Ticket (Ticket #2 bị AI nhận nhầm thành REQUEST)
+        req_msg2 = {"msg_id": "m_m2", "group_id": gid, "sender_id": "c1", "sender_name": "Khách A", "content": "Anh báo giá máy in màu luôn nhé", "timestamp": now_ms + 1000}
+        MessageDAO.save_message(req_msg2["msg_id"], req_msg2["group_id"], req_msg2["sender_id"], req_msg2["sender_name"], req_msg2["content"], req_msg2["timestamp"])
+        source_tid = self.tm.process_request(req_msg2, 0.95, 0)
+
+        self.assertIsNotNone(target_tid)
+        self.assertIsNotNone(source_tid)
+
+        # Thực hiện Gộp source_tid vào target_tid
+        success = self.tm.merge_ticket(source_tid, target_tid)
+        self.assertTrue(success)
+
+        # 1. Ticket nguồn bị xóa khỏi DB
+        self.assertIsNone(TicketDAO.get_ticket_by_id(source_tid))
+
+        # 2. Tin nhắn m_m2 được gắn làm RESPONSE của target_tid
+        target_resps = TicketDAO.get_ticket_responses(target_tid)
+        self.assertEqual(len(target_resps), 1)
+        self.assertEqual(target_resps[0]["response_msg_id"], "m_m2")
+        self.assertEqual(target_resps[0]["response_content"], "Anh báo giá máy in màu luôn nhé")
+
 if __name__ == "__main__":
     unittest.main()
