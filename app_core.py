@@ -107,6 +107,7 @@ class TicketManager:
             logger.info(f"Tự động liên kết RESPONSE của {sender_name} vào Ticket duy nhất #{chosen_ticket_id}.")
 
         else:
+            # 1. Kiểm tra đề xuất từ AI xem target_ticket_id có hợp lệ không
             if target_ticket_id is not None:
                 try:
                     ai_tid = int(target_ticket_id)
@@ -116,16 +117,31 @@ class TicketManager:
                 except ValueError:
                     pass
 
+            # 2. Heuristic: Ưu tiên chọn Ticket có requester_name trùng khớp với sender_name của tin nhắn
+            if chosen_ticket_id is None:
+                sender_clean = sender_name.strip().lower()
+                matching_sender_tickets = [
+                    t for t in open_tickets if t["requester_name"].strip().lower() == sender_clean
+                ]
+                if matching_sender_tickets:
+                    # Nếu người gửi có Ticket đang mở ➔ Chọn Ticket mở mới nhất của người gửi này
+                    matching_sender_tickets.sort(key=lambda t: t["created_at"], reverse=True)
+                    chosen_ticket_id = matching_sender_tickets[0]["id"]
+                    heuristics_used = True
+                    logger.info(f"Heuristic: Ghép RESPONSE vào Ticket #{chosen_ticket_id} của {sender_name} (Khớp trùng tên người gửi).")
+
+            # 3. Heuristic bổ sung: Kiểm tra xem tên của người tạo Ticket có nằm trong nội dung tin nhắn không
             if chosen_ticket_id is None:
                 content_lower = content.lower()
                 for ticket in open_tickets:
-                    req_name_lower = ticket["requester_name"].lower()
-                    if req_name_lower in content_lower:
+                    req_name_lower = ticket["requester_name"].strip().lower()
+                    if req_name_lower and req_name_lower in content_lower:
                         chosen_ticket_id = ticket["id"]
                         heuristics_used = True
-                        logger.info(f"Heuristic: Ghép RESPONSE vào Ticket #{chosen_ticket_id} của {ticket['requester_name']} (Khớp tên).")
+                        logger.info(f"Heuristic: Ghép RESPONSE vào Ticket #{chosen_ticket_id} của {ticket['requester_name']} (Nhắc tới tên).")
                         break
 
+            # 4. Fallback cuối cùng: Chọn Ticket mới nhất trong nhóm
             if chosen_ticket_id is None:
                 sorted_tickets = sorted(open_tickets, key=lambda t: t["created_at"], reverse=True)
                 chosen_ticket_id = sorted_tickets[0]["id"]
