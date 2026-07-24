@@ -619,5 +619,54 @@ class TestZaloCsTracker(unittest.TestCase):
         self.assertEqual(t_created["request_content"], "Phần mềm bị treo khi bấm lưu hóa đơn")
         self.assertEqual(t_created["status"], "PENDING")
 
+    def test_split_ticket_smart_linking(self):
+        # 1. Tạo nhóm và Ticket gốc với 2 tin nhắn phản hồi
+        gid = "g_split_test"
+        GroupDAO.add_group(gid, "Group Split Test", 1)
+        GroupDAO.set_group_support_staff(gid, ["KTV Nam"])
+
+        now_ms = int(time.time() * 1000)
+        req_msg = {"msg_id": "m_split_orig", "group_id": gid, "sender_id": "c1", "sender_name": "Khách Alpha", "content": "Lỗi 1: Không in được phiếu xuất", "timestamp": now_ms}
+        MessageDAO.save_message(req_msg["msg_id"], req_msg["group_id"], req_msg["sender_id"], req_msg["sender_name"], req_msg["content"], req_msg["timestamp"])
+        orig_tid = self.tm.process_request(req_msg, 0.95, 0)
+
+        # Phản hồi 1 từ Khách Alpha (Yêu cầu mới gửi nhầm dưới dạng phản hồi)
+        resp1_msg = {"msg_id": "m_split_r1", "group_id": gid, "sender_id": "c1", "sender_name": "Khách Alpha", "content": "Lỗi 2: Không xuất được file Excel", "timestamp": now_ms + 1000}
+        MessageDAO.save_message(resp1_msg["msg_id"], resp1_msg["group_id"], resp1_msg["sender_id"], resp1_msg["sender_name"], resp1_msg["content"], resp1_msg["timestamp"])
+        self.tm.process_response(resp1_msg, target_ticket_id=orig_tid, confidence=0.9, needs_review=0)
+
+        # Phản hồi 2 từ KTV Nam trả lời cho Lỗi 2
+        resp2_msg = {"msg_id": "m_split_r2", "group_id": gid, "sender_id": "ktv1", "sender_name": "KTV Nam", "content": "Đã hướng dẫn xuất lại file Excel", "timestamp": now_ms + 2000}
+        MessageDAO.save_message(resp2_msg["msg_id"], resp2_msg["group_id"], resp2_msg["sender_id"], resp2_msg["sender_name"], resp2_msg["content"], resp2_msg["timestamp"])
+        self.tm.process_response(resp2_msg, target_ticket_id=orig_tid, confidence=0.9, needs_review=0)
+
+        # Lấy danh sách response IDs của orig_tid
+        responses = TicketDAO.get_ticket_responses(orig_tid)
+        self.assertEqual(len(responses), 2)
+        resp_ids = [r["id"] for r in responses]
+
+        # 2. Thực hiện Tách Ticket từ 2 phản hồi được chọn
+        new_tid = self.tm.split_ticket(resp_ids)
+        self.assertIsNotNone(new_tid)
+        self.assertNotEqual(orig_tid, new_tid)
+
+        # Kiểm tra Ticket mới: Yêu cầu gốc là Lỗi 2
+        new_ticket = TicketDAO.get_ticket_by_id(new_tid)
+        self.assertEqual(new_ticket["requester_name"], "Khách Alpha")
+        self.assertEqual(new_ticket["request_content"], "Lỗi 2: Không xuất được file Excel")
+        
+        # Vì có phản hồi 2 từ KTV Nam ➔ Ticket mới tự động chuyển sang PROCESSING
+        self.assertEqual(new_ticket["status"], "PROCESSING")
+        self.assertIsNotNone(new_ticket["acknowledged_at"])
+
+        # Kiểm tra các phản hồi của Ticket mới có chứa Phản hồi 2 từ KTV Nam
+        new_responses = TicketDAO.get_ticket_responses(new_tid)
+        self.assertEqual(len(new_responses), 1)
+        self.assertEqual(new_responses[0]["responder_name"], "KTV Nam")
+
+        # Kiểm tra Ticket cũ không còn phản hồi nào
+        old_responses = TicketDAO.get_ticket_responses(orig_tid)
+        self.assertEqual(len(old_responses), 0)
+
 if __name__ == "__main__":
     unittest.main()

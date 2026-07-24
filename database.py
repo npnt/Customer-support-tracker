@@ -429,6 +429,19 @@ class TicketDAO:
             return [dict(row) for row in cursor.fetchall()]
 
     @staticmethod
+    def get_response_by_id(response_id):
+        with get_connection() as conn:
+            cursor = conn.execute("SELECT * FROM responses WHERE id = ?", (response_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    @staticmethod
+    def delete_response_by_id(response_id):
+        with get_connection() as conn:
+            conn.execute("DELETE FROM responses WHERE id = ?", (response_id,))
+            conn.commit()
+
+    @staticmethod
     def get_supported_tickets(group_id):
         with get_connection() as conn:
             cursor = conn.execute(

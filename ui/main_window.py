@@ -283,8 +283,8 @@ class MainWindow(tk.Tk):
         self.reopen_btn = ttk.Button(btn_frame, text="🔓 Mở Lại Yêu Cầu", command=self.on_reopen_clicked, state="disabled")
         self.reopen_btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
         
-        self.reanalyze_btn = ttk.Button(btn_frame, text="🔄 AI Phân Tích Lại", command=self.on_reanalyze_clicked, state="disabled")
-        self.reanalyze_btn.pack(side="left", fill="x", expand=True)
+        self.split_ticket_btn = ttk.Button(btn_frame, text="✂️ Tách Ticket", command=self.on_split_ticket_clicked, state="disabled")
+        self.split_ticket_btn.pack(side="left", fill="x", expand=True)
         
         main_pane.add(right_frame, weight=2)
 
@@ -650,7 +650,7 @@ class MainWindow(tk.Tk):
         else:
             self.resolve_btn.configure(state="normal")
             self.reopen_btn.configure(state="disabled")
-        self.reanalyze_btn.configure(state="normal")
+        self.split_ticket_btn.configure(state="disabled")
 
     def on_tree_select(self, event):
         selected_items = self.response_tree.selection()
@@ -658,7 +658,7 @@ class MainWindow(tk.Tk):
             self.selected_ticket_id = None
             self.resolve_btn.configure(state="disabled")
             self.reopen_btn.configure(state="disabled")
-            self.reanalyze_btn.configure(state="disabled")
+            self.split_ticket_btn.configure(state="disabled")
             self.update_ticket_header_info(None)
             return
             
@@ -675,6 +675,8 @@ class MainWindow(tk.Tk):
             ticket_id = None
             
         self.selected_ticket_id = ticket_id
+        has_resp_selection = any(item_id.startswith("resp_") for item_id in selected_items)
+
         if ticket_id:
             ticket = TicketDAO.get_ticket_by_id(ticket_id)
             if ticket:
@@ -687,7 +689,11 @@ class MainWindow(tk.Tk):
                 else:
                     self.resolve_btn.configure(state="normal")
                     self.reopen_btn.configure(state="disabled")
-                self.reanalyze_btn.configure(state="normal")
+
+        if has_resp_selection:
+            self.split_ticket_btn.configure(state="normal")
+        else:
+            self.split_ticket_btn.configure(state="disabled")
 
     def on_resolve_clicked(self):
         if not self.selected_ticket_id:
@@ -715,18 +721,26 @@ class MainWindow(tk.Tk):
             self.refresh_ui()
             self.show_status_message(f"Đã mở lại Ticket #{ticket['id']} (Trạng thái mới: {new_status}).")
 
-    def on_reanalyze_clicked(self):
-        if not self.selected_ticket_id:
+    def on_split_ticket_clicked(self):
+        selected_items = self.response_tree.selection()
+        response_ids = []
+        for item_id in selected_items:
+            if item_id.startswith("resp_"):
+                try:
+                    response_ids.append(int(item_id.split("_")[1]))
+                except ValueError:
+                    pass
+
+        if not response_ids:
+            messagebox.showwarning("Cảnh báo", "Vui lòng chọn ít nhất một tin nhắn phản hồi dưới cây Cột 3 để tách.")
             return
-            
-        ticket = TicketDAO.get_ticket_by_id(self.selected_ticket_id)
-        if not ticket:
-            return
-            
-        req_msg = MessageDAO.get_message_by_id(ticket["request_msg_id"])
-        if req_msg:
-            self.core.enqueue_message(req_msg)
-            self.show_status_message(f"Đã gửi yêu cầu AI phân tích lại cho Ticket #{ticket['id']}.")
+
+        if messagebox.askyesno("Xác nhận Tách Ticket", f"Bạn có chắc muốn tách {len(response_ids)} tin nhắn đã chọn thành một Ticket mới độc lập?"):
+            new_ticket_id = self.core.ticket_manager.split_ticket(response_ids)
+            if new_ticket_id:
+                self.refresh_ui()
+                self.show_status_message(f"Đã tách thành công {len(response_ids)} tin nhắn thành Ticket mới #{new_ticket_id}.")
+                messagebox.showinfo("Thành công", f"Đã tách {len(response_ids)} tin nhắn thành Ticket mới #{new_ticket_id}!")
 
     def on_add_group_clicked(self):
         self.show_status_message("Đang tải danh sách nhóm từ Zalo...")
@@ -854,23 +868,7 @@ class MainWindow(tk.Tk):
             self.selected_ticket_id = None
             self.ticket_info_label.configure(text="Vui lòng chọn một yêu cầu để xem chi tiết.")
             self.resolve_btn.configure(state="disabled")
-            self.reanalyze_btn.configure(state="disabled")
-
-    def on_reanalyze_clicked(self):
-        if not self.selected_ticket_id:
-            return
-            
-        ticket = TicketDAO.get_ticket_by_id(self.selected_ticket_id)
-        if not ticket:
-            return
-            
-        msg = MessageDAO.get_message_by_id(ticket["request_msg_id"])
-        if msg:
-            MessageDAO.update_classification(msg["msg_id"], None, None, 0, None)
-            self.core.enqueue_message(msg)
-            messagebox.showinfo("Thông báo", "Yêu cầu đã được gửi lại vào hàng đợi AI để phân tích.")
-            self.refresh_ticket_list()
-            self.refresh_supported_tickets_tree()
+            self.split_ticket_btn.configure(state="disabled")
 
     def on_vacuum_clicked(self):
         try:

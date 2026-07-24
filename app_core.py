@@ -238,6 +238,99 @@ class TicketManager:
         TicketDAO.update_ticket_status(ticket_id, "RESOLVED", resolved_at=current_time_ms, auto_resolved=0)
         logger.info(f"Người dùng đóng Ticket #{ticket_id} (RESOLVED thủ công).")
 
+    def split_ticket(self, response_ids):
+        """
+        Tách danh sách các tin nhắn phản hồi (response_ids) thành một Ticket mới độc lập.
+        - Tin nhắn đầu tiên dùng làm Yêu cầu gốc (REQUEST) khởi tạo Ticket mới.
+        - Các tin nhắn phản hồi còn lại được phân tích và gắn vào làm lịch sử phản hồi của Ticket mới.
+        - Tự động chuyển trạng thái Ticket mới sang PROCESSING nếu có phản hồi từ Nhân viên Hỗ trợ.
+        """
+        if not response_ids:
+            return None
+
+        # 1. Lấy thông tin các phản hồi từ DB theo thứ tự thời gian tăng dần
+        resp_objects = []
+        for rid in response_ids:
+            resp_obj = TicketDAO.get_response_by_id(rid)
+            if resp_obj:
+                resp_objects.append(resp_obj)
+
+        if not resp_objects:
+            return None
+
+        resp_objects.sort(key=lambda x: x["created_at"])
+        primary_resp = resp_objects[0]
+        remaining_resps = resp_objects[1:]
+
+        # Lấy thông tin ticket gốc để tra cứu group_id
+        old_ticket = TicketDAO.get_ticket_by_id(primary_resp["ticket_id"])
+        if not old_ticket:
+            return None
+
+        group_id = old_ticket["group_id"]
+
+        # 2. Xóa các phản hồi đã chọn khỏi bảng responses của ticket cũ
+        for r in resp_objects:
+            TicketDAO.delete_response_by_id(r["id"])
+
+        # 3. Tạo Ticket mới từ tin nhắn phản hồi đầu tiên (primary_resp)
+        sla = GroupDAO.get_sla_settings(group_id)
+        max_response = sla["max_response_time"]
+        max_resolve = sla["max_resolve_time"]
+        timestamp = primary_resp["created_at"]
+
+        response_deadline = timestamp + (max_response * 60 * 1000)
+        resolve_deadline = timestamp + (max_resolve * 60 * 1000)
+
+        new_ticket_id = TicketDAO.create_ticket(
+            group_id=group_id,
+            request_msg_id=primary_resp["response_msg_id"],
+            requester_name=primary_resp["responder_name"],
+            request_content=primary_resp["response_content"],
+            created_at=timestamp,
+            response_deadline=response_deadline,
+            resolve_deadline=resolve_deadline,
+            needs_review=0
+        )
+
+        # Cập nhật phân loại tin nhắn gốc thành REQUEST trong bảng messages
+        MessageDAO.update_classification(primary_resp["response_msg_id"], "REQUEST", 1.0, 0, new_ticket_id)
+        logger.info(f"Đã tách và tạo Ticket mới #{new_ticket_id} từ tin nhắn của {primary_resp['responder_name']}.")
+
+        # 4. Gắn các tin nhắn phản hồi còn lại vào Ticket mới và kiểm tra tiếp nhận
+        has_staff_response = False
+        earliest_staff_ack = None
+
+        for rem_resp in remaining_resps:
+            TicketDAO.add_response(
+                ticket_id=new_ticket_id,
+                response_msg_id=rem_resp["response_msg_id"],
+                responder_name=rem_resp["responder_name"],
+                response_content=rem_resp["response_content"],
+                created_at=rem_resp["created_at"]
+            )
+
+            # Kiểm tra xem có phản hồi từ KTV/Nhân viên Hỗ trợ đã phân công không
+            is_staff = GroupDAO.is_support_staff(group_id, rem_resp["responder_name"])
+            is_different = rem_resp["responder_name"].strip().lower() != primary_resp["responder_name"].strip().lower()
+
+            if is_staff and is_different:
+                has_staff_response = True
+                if earliest_staff_ack is None or rem_resp["created_at"] < earliest_staff_ack:
+                    earliest_staff_ack = rem_resp["created_at"]
+
+            MessageDAO.update_classification(rem_resp["response_msg_id"], "RESPONSE", 1.0, 0, new_ticket_id)
+
+        # 5. Nếu có phản hồi từ KTV ➔ Tự động chuyển Ticket mới sang PROCESSING
+        if has_staff_response and earliest_staff_ack:
+            TicketDAO.update_ticket_status(new_ticket_id, "PROCESSING", acknowledged_at=earliest_staff_ack)
+            logger.info(f"Ticket mới #{new_ticket_id} tự động chuyển sang PROCESSING từ phản hồi của KTV.")
+
+        # Cập nhật lại trạng thái Ticket cũ (nếu không còn response nào thì quay lại PENDING nếu cần)
+        TicketDAO.reopen_ticket(old_ticket["id"])
+
+        return new_ticket_id
+
     @staticmethod
     def get_remaining_sla(ticket):
         now_ms = int(time.time() * 1000)
