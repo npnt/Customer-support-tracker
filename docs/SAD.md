@@ -49,23 +49,27 @@ Hệ thống **Zalo Customer Support Tracker** được thiết kế theo mô h�
   - Giao diện chính phân 3 cột (PanedWindow):
     - **Cột 1 (Bên trái)**: Trạng thái kết nối, nút đăng nhập QR, nút `⚙️ Thiết lập SLA`, nút `👥 QL Nhân Viên` và danh sách các nhóm Zalo đang theo dõi (`group_listbox`).
     - **Cột 2 (Ở giữa)**: Thẻ Ticket đang chờ hỗ trợ (`ticket_cards`) và Bảng tin nhắn thời gian thực (`live_tree`).
-    - **Cột 3 (Bên phải)**: Header chi tiết thông tin Ticket kèm thời gian SLA xử lý đếm ngược (tô màu Đỏ/Vàng/Xanh) và Cây phản hồi (`response_tree`).
+    - **Cột 3 (Bên phải)**: Header chi tiết thông tin Ticket kèm thời gian SLA xử lý đếm ngược (tô màu Đỏ/Vàng/Xanh), Cây phản hồi trao đổi 2 chiều (`response_tree` có `rowheight=32`), và bộ nút hành động (`✅ Đóng Yêu Cầu`, `🔓 Mở Lại Yêu Cầu`, `✂️ Tách Ticket`).
 - **`ui/dashboard.py` (`DashboardWindow`)**:
   - Cửa sổ báo cáo & thống kê SLA với 2 Tab:
     - **Tab Nhóm Zalo**: Thẻ KPI động + Bảng dữ liệu + Biểu đồ Canvas so sánh SLA nhóm.
     - **Tab Nhân Viên Hỗ Trợ**: Dropdown lọc theo từng nhóm Zalo + Bảng năng suất nhân viên (chỉ lọc nhân viên được phân công) + Cột Ticket Quá Hạn Xử Lý + Biểu đồ cột Canvas.
 - **`ui/dialogs.py`**:
   - Định nghĩa các cửa sổ Modal popup: `LoginDialog`, `SlaSettingsDialog`, `GroupSelectDialog`, `StaffManagementDialog`.
-  - Chứa hàm utility `center_window_over_parent(dlg, parent)` tự động căn giữa popup trên đúng màn hình phụ đối với máy tính đa màn hình.
+  - Tích hợp Combobox chọn nhóm trực tiếp trong `StaffManagementDialog`.
+  - Chứa hàm utility `center_window_over_parent(dlg, parent)` tự động căn giữa popup (bảo toàn kích thước `dw x dh + cx + cy`) trên đúng màn hình phụ đối với máy tính đa màn hình.
 
 ### 2.2 Tầng Nghiệp Vụ & AI (Business Core Layer)
-- **`app_core.py` (`TicketManager`)**:
+- **`app_core.py` (`TicketManager`, `AppCore`)**:
   - Quản lý máy trạng thái Ticket (Ticket State Machine).
+  - Lọc bỏ triệt để các tin nhắn hình ảnh, file đính kèm, photo (`is_ai_eligible_message`) khỏi AI Queue và tự động gán nhãn `OTHER`.
   - Tự động tạo Ticket khi nhận tin nhắn `REQUEST`.
-  - Tự động kiểm tra `GroupDAO.is_support_staff(group_id, sender_name)`. Chỉ các tin nhắn từ **Nhân viên Hỗ trợ được phân công** mới liên kết vào `responses` và chuyển Ticket từ `PENDING` ➔ `PROCESSING`.
+  - Lưu trữ đầy đủ tin nhắn phản hồi 2 chiều của cả Khách hàng và KTV vào bảng `responses`. Chỉ chuyển Ticket `PENDING` ➔ `PROCESSING` khi người phản hồi là **Nhân viên Hỗ trợ được phân công**.
+  - Thực hiện tách Ticket (`split_ticket`): Chuyển phản hồi được chọn thành Ticket mới và liên kết thông minh các phản hồi liên quan.
   - Xử lý tin nhắn `RESOLVE` của khách hàng và tự động đóng Ticket (`auto_resolved = 1`).
 - **`ai_service.py` (`AIService`)**:
-  - Phân loại ý định tin nhắn: `REQUEST`, `RESPONSE`, `RESOLVE`.
+  - Phân loại ý định tin nhắn (`REQUEST`, `RESPONSE`, `RESOLVE`, `OTHER`).
+  - Hệ thống Prompt cấm tuyệt đối phân loại chỉ báo hình ảnh thành `REQUEST`/`RESPONSE`/`RESOLVE` và ưu tiên khớp `sender_name` với `requester_name`.
 
 ### 2.3 Tầng Dịch Vụ & Truy Xuất Dữ Liệu (Service & Data Access Layer)
 - **`zalo_service.py` (`ZaloService`)**:

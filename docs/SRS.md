@@ -42,16 +42,18 @@ Hệ thống **Zalo Customer Support Tracker** là ứng dụng Desktop hỗ tr�
   - `REQUEST`: Khách hàng báo lỗi, đặt câu hỏi hoặc yêu cầu hỗ trợ mới.
   - `RESPONSE`: Nhân viên hỗ trợ trả lời khách hàng, hoặc khách hàng gửi thêm ảnh/thông tin bổ sung cho Ticket hiện tại.
   - `RESOLVE`: Khách hàng cám ơn, báo sự cố đã được khắc phục hoặc xác nhận đóng yêu cầu.
-- **FR-03.2**: Tự động bỏ qua các tin nhắn dạng Sticker, thả biểu tượng cảm xúc (emotion icons) hoặc thông báo hệ thống.
-- **FR-03.3**: Cung cấp nút `🤖 Phân Loại Lại Bằng AI` cho phép người dùng kích hoạt phân loại lại thủ công.
+- **FR-03.2**: Tự động lọc bỏ các tin nhắn dạng Sticker, thả biểu tượng cảm xúc, tin nhắn chứa hình ảnh (`[Hình ảnh đính kèm...]`, `[Tập tin...]`, `Photo`, `File`, `Sticker`) khỏi AI Queue và tự động gán nhãn `OTHER`.
+- **FR-03.3**: Cung cấp nút `✂️ Tách Ticket` ở Cột 3 cho phép người dùng tích chọn 1 hoặc nhiều tin nhắn phản hồi dưới cây Cột 3 để tách thành Ticket mới độc lập.
 
 ### FR-04: Quản Lý Vòng Đời Ticket (Ticket Lifecycle)
 - **FR-04.1**: Tạo Ticket mới ở trạng thái `PENDING` khi nhận tin nhắn `REQUEST` từ khách hàng.
 - **FR-04.2**: Chuyển Ticket sang `PROCESSING` khi Nhân viên Hỗ trợ được phân công gửi phản hồi (`RESPONSE`).
-- **FR-04.3**: Chuyển Ticket sang `RESOLVED` khi:
+- **FR-04.3**: Lưu trữ đầy đủ lịch sử trao đổi 2 chiều (kể cả phản hồi bổ sung của Khách hàng) trong bảng `responses` để hiển thị trên cây Cột 3 với chiều cao dòng thoáng (`rowheight=32`).
+- **FR-04.4**: Chuyển Ticket sang `RESOLVED` khi:
   - Khách hàng gửi tin nhắn `RESOLVE` (AI tự động đóng Ticket với `auto_resolved = 1` và icon `🤖`).
   - Người dùng bấm nút check `✅ Đóng Yêu Cầu` thủ công (đóng Ticket bởi người dùng với icon `✅`).
-- **FR-04.4**: Cho phép mở lại Ticket (`RESOLVED` ➔ `PENDING`/`PROCESSING`) thông qua nút `🔓 Mở Lại Yêu Cầu`.
+- **FR-04.5**: Cho phép mở lại Ticket (`RESOLVED` ➔ `PENDING`/`PROCESSING`) thông qua nút `🔓 Mở Lại Yêu Cầu`.
+- **FR-04.6**: Cho phép tách 1 hoặc nhiều tin nhắn phản hồi thành Ticket mới (`✂️ Tách Ticket`). AI phân tích và liên kết thông minh các phản hồi liên quan, tự động xác định trạng thái `PENDING` hay `PROCESSING` cho Ticket mới.
 
 ### FR-05: Thiết Lập & Đếm Ngược SLA (Service Level Agreement)
 - **FR-05.1**: Cung cấp cửa sổ thiết lập thời gian SLA Tiếp nhận (`max_response_time`) và SLA Xử lý (`max_resolve_time`) cho từng nhóm Zalo (mặc định 15 phút / 60 phút).
