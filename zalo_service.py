@@ -191,8 +191,60 @@ class ZaloBot(ZaloAPI if ZALO_AVAILABLE else object):
             else:
                 content = "[Tin nhắn trống]"
 
+        reply_to_msg_id = self.extract_reply_to_msg_id(message_object, metadata, kwargs)
+
         if self.message_callback:
-            self.message_callback(mid, thread_id, author_id, sender_name, content, ts)
+            try:
+                self.message_callback(mid, thread_id, author_id, sender_name, content, ts, reply_to_msg_id)
+            except TypeError:
+                self.message_callback(mid, thread_id, author_id, sender_name, content, ts)
+
+    @staticmethod
+    def extract_reply_to_msg_id(message_object, metadata=None, kwargs=None):
+        reply_to_msg_id = None
+        if message_object:
+            if isinstance(message_object, dict):
+                quote_obj = message_object.get("quote") or message_object.get("quoteMsg") or message_object.get("replyMsg")
+                if isinstance(quote_obj, dict):
+                    reply_to_msg_id = quote_obj.get("msgId") or quote_obj.get("id") or quote_obj.get("cliMsgId") or quote_obj.get("globalMsgId")
+                
+                if not reply_to_msg_id:
+                    reply_to_msg_id = (
+                        message_object.get("quoteMsgId") or 
+                        message_object.get("quote_msg_id") or 
+                        message_object.get("rMsgId") or 
+                        message_object.get("replyMsgId") or
+                        message_object.get("replyToMsgId") or
+                        message_object.get("srcId")
+                    )
+            else:
+                quote_obj = getattr(message_object, "quote", None) or getattr(message_object, "quoteMsg", None) or getattr(message_object, "replyMsg", None)
+                if quote_obj:
+                    if isinstance(quote_obj, dict):
+                        reply_to_msg_id = quote_obj.get("msgId") or quote_obj.get("id") or quote_obj.get("cliMsgId") or quote_obj.get("globalMsgId")
+                    else:
+                        reply_to_msg_id = getattr(quote_obj, "msgId", None) or getattr(quote_obj, "id", None) or getattr(quote_obj, "cliMsgId", None) or getattr(quote_obj, "globalMsgId", None)
+                
+                if not reply_to_msg_id:
+                    reply_to_msg_id = (
+                        getattr(message_object, "quoteMsgId", None) or 
+                        getattr(message_object, "quote_msg_id", None) or 
+                        getattr(message_object, "rMsgId", None) or 
+                        getattr(message_object, "replyMsgId", None) or
+                        getattr(message_object, "replyToMsgId", None)
+                    )
+
+        if not reply_to_msg_id and metadata and isinstance(metadata, dict):
+            quote_obj = metadata.get("quote") or metadata.get("quoteMsg")
+            if isinstance(quote_obj, dict):
+                reply_to_msg_id = quote_obj.get("msgId") or quote_obj.get("id")
+            if not reply_to_msg_id:
+                reply_to_msg_id = metadata.get("quoteMsgId") or metadata.get("rMsgId") or metadata.get("replyMsgId")
+
+        if not reply_to_msg_id and kwargs and isinstance(kwargs, dict):
+            reply_to_msg_id = kwargs.get("quoteMsgId") or kwargs.get("reply_to_msg_id") or kwargs.get("rMsgId")
+
+        return str(reply_to_msg_id).strip() if reply_to_msg_id is not None else None
 
     def onReaction(self, reaction, message_id, author_id, thread_id, thread_type, message_object=None, **kwargs):
         content = f"Thả cảm xúc {reaction}"
@@ -271,10 +323,19 @@ class QrLoginThread(threading.Thread):
 
     def run(self):
         try:
+            self.progress_cb("Đang kiểm tra trình duyệt & thư viện...")
+            try:
+                from selenium import webdriver
+                from selenium.webdriver.chrome.options import Options
+            except ImportError:
+                import sys, subprocess
+                logger.warning(f"Selenium chưa có trong {sys.executable}, đang tự động cài đặt...")
+                self.progress_cb("Đang tự động cài đặt thư viện 'selenium'...")
+                subprocess.run([sys.executable, "-m", "pip", "install", "selenium"], check=True)
+                from selenium import webdriver
+                from selenium.webdriver.chrome.options import Options
+
             self.progress_cb("Đang khởi động trình duyệt Chrome...")
-            from selenium import webdriver
-            from selenium.webdriver.chrome.options import Options
-            
             options = Options()
             options.add_argument("--window-size=550,650")
             options.add_argument("--disable-gpu")
@@ -329,9 +390,12 @@ class QrLoginThread(threading.Thread):
             else:
                 self.error_cb("Đăng nhập QR thất bại hoặc trình duyệt bị đóng.")
                 
-        except ImportError:
-            self.error_cb("Chưa cài đặt thư viện 'selenium'. Vui lòng chạy: pip install selenium")
+        except ImportError as imp_err:
+            import sys
+            logger.error(f"ImportError in QrLoginThread: {imp_err}")
+            self.error_cb(f"Chưa cài đặt thư viện 'selenium' trong môi trường Python:\n{sys.executable}\n\nVui lòng mở Terminal và chạy lệnh:\n\"{sys.executable}\" -m pip install selenium")
         except Exception as e:
+            logger.error(f"Exception in QrLoginThread: {e}")
             self.error_cb(f"Lỗi khởi động trình duyệt: {e}\n(Vui lòng đảm bảo Google Chrome đã được cài đặt)")
 
 class ZaloService:
@@ -460,8 +524,98 @@ class ZaloService:
         return None
 
     def fetch_group_messages(self, group_id, count=100):
-        # Trả về danh sách rỗng do thư viện zlapi hiện tại không hỗ trợ API fetchThreadMessages để lấy tin nhắn cũ
-        return []
+        """
+        Lấy danh sách các tin nhắn mới nhất trong nhóm từ Zalo API (getRecentGroup / getrecentv2).
+        """
+        if not self.client or not ZALO_AVAILABLE:
+            return []
+
+        gid_str = str(group_id)
+        messages_list = []
+
+        try:
+            res = self.client.getRecentGroup(gid_str)
+            raw_msgs = []
+
+            if res:
+                if isinstance(res, dict):
+                    raw_msgs = res.get("groupMsgs") or res.get("groupMsg") or res.get("msgs") or res.get("msgList") or []
+                elif hasattr(res, "groupMsgs"):
+                    raw_msgs = getattr(res, "groupMsgs", [])
+                elif hasattr(res, "msgs"):
+                    raw_msgs = getattr(res, "msgs", [])
+
+            if isinstance(res, list):
+                raw_msgs = res
+
+            for item in raw_msgs:
+                if not item:
+                    continue
+
+                msg_id = None
+                if isinstance(item, dict):
+                    msg_id = item.get("msgId") or item.get("cliMsgId") or item.get("globalMsgId") or item.get("id")
+                else:
+                    msg_id = getattr(item, "msgId", None) or getattr(item, "cliMsgId", None) or getattr(item, "globalMsgId", None) or getattr(item, "id", None)
+
+                if not msg_id:
+                    continue
+
+                sender_id = None
+                if isinstance(item, dict):
+                    sender_id = item.get("uidFrom") or item.get("srcId") or item.get("fromId") or item.get("authorId") or item.get("senderId") or item.get("userId")
+                else:
+                    sender_id = getattr(item, "uidFrom", None) or getattr(item, "srcId", None) or getattr(item, "fromId", None) or getattr(item, "authorId", None) or getattr(item, "senderId", None)
+
+                sender_name = None
+                if isinstance(item, dict):
+                    sender_name = item.get("dName") or item.get("displayName") or item.get("senderName") or item.get("fromName") or item.get("name")
+                else:
+                    sender_name = getattr(item, "dName", None) or getattr(item, "displayName", None) or getattr(item, "senderName", None) or getattr(item, "fromName", None)
+
+                if not sender_name and sender_id:
+                    info = self.fetch_user_info(sender_id)
+                    if info and info.get("name"):
+                        sender_name = info["name"]
+
+                content = None
+                if isinstance(item, dict):
+                    content = item.get("message") or item.get("content") or item.get("title") or item.get("text") or item.get("desc")
+                else:
+                    content = getattr(item, "message", None) or getattr(item, "content", None) or getattr(item, "title", None) or getattr(item, "text", None)
+
+                if isinstance(content, dict):
+                    content = content.get("content") or content.get("title") or content.get("text") or str(content)
+                elif content is None:
+                    content = ""
+
+                timestamp = None
+                if isinstance(item, dict):
+                    timestamp = item.get("ts") or item.get("timestamp") or item.get("cliMsgTime") or item.get("time")
+                else:
+                    timestamp = getattr(item, "ts", None) or getattr(item, "timestamp", None) or getattr(item, "cliMsgTime", None) or getattr(item, "time", None)
+
+                try:
+                    timestamp = int(timestamp)
+                except (ValueError, TypeError):
+                    timestamp = int(time.time() * 1000)
+
+                messages_list.append({
+                    "msg_id": str(msg_id),
+                    "group_id": gid_str,
+                    "sender_id": str(sender_id) if sender_id else "",
+                    "sender_name": str(sender_name) if sender_name else (f"User_{sender_id}" if sender_id else "Khách Hàng"),
+                    "content": str(content),
+                    "timestamp": timestamp
+                })
+
+            logger.info(f"fetch_group_messages: Đã truy vấn thành công {len(messages_list)} tin nhắn gần đây từ nhóm {group_id}")
+
+        except Exception as e:
+            logger.error(f"Lỗi khi fetch_group_messages cho nhóm {group_id}: {e}")
+
+        messages_list.sort(key=lambda x: x["timestamp"])
+        return messages_list
 
     def fetch_group_members(self, group_id):
         """
